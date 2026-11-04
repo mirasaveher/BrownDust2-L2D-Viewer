@@ -30,7 +30,8 @@ jobs:
         run: npm install
 
       - name: Configure Pages path
-        run: sed -i "s|base: '/'|base: '/BrownDust2-L2D-Viewer/'|" vite.config.mjs
+        run: |
+          sed -i "s|base: '/'|base: '/BrownDust2-L2D-Viewer/'|" vite.config.mjs
 
       - name: Build site
         run: npm run build
