@@ -43,7 +43,7 @@ const activeComposites = computed(() => activeSpineSet.value === 'ultimate' ? (c
 const characterAssetRoot = computed(() => {
   const character = selectedCharacterData.value
   const folderName = getCharacterFolderName(character, selectedCharacter.value)
-  return `/${selectedCharacter.value}/${folderName}/`
+  return `${import.meta.env.BASE_URL}${selectedCharacter.value}/${folderName}/`
 })
 const multiDatingVariants = computed(() => selectedCharacterData.value.datingVariants || [])
 const datingPreloadVariant = computed(() => multiDatingVariants.value[1] || '')
@@ -66,7 +66,7 @@ const selectedAudioBase = computed(() => {
   const character = selectedCharacterData.value
   if (!character.audio || !/^\d+(?:_c)?$/i.test(selectedCharacter.value)) return ''
   const folderName = getCharacterFolderName(character, selectedCharacter.value)
-  return `/${selectedCharacter.value}/${folderName}/${audioLanguage.value}/${character.audio}`
+  return `${import.meta.env.BASE_URL}${selectedCharacter.value}/${folderName}/${audioLanguage.value}/${character.audio}`
 })
 const selectedMotion = ref('Idle')
 const playing = ref(true)
