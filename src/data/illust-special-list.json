@@ -1,0 +1,296 @@
+[
+  {
+    "id": "illust_special1",
+    "folder": "illust_special1",
+    "asset": "illust_special1",
+    "label": "Illust Special 1"
+  },
+  {
+    "id": "illust_special2",
+    "folder": "illust_special2",
+    "asset": "illust_special2",
+    "label": "Illust Special 2"
+  },
+  {
+    "id": "illust_special4",
+    "folder": "illust_special4",
+    "asset": "illust_special4",
+    "label": "Illust Special 4"
+  },
+  {
+    "id": "illust_special5",
+    "folder": "illust_special5",
+    "asset": "illust_special5",
+    "label": "Illust Special 5"
+  },
+  {
+    "id": "illust_special6",
+    "folder": "illust_special6",
+    "asset": "illust_special6",
+    "label": "Illust Special 6"
+  },
+  {
+    "id": "illust_special7_1",
+    "folder": "illust_special7_1",
+    "asset": "illust_special7_1",
+    "label": "Illust Special 7.1"
+  },
+  {
+    "id": "illust_special7_2",
+    "folder": "illust_special7_2",
+    "asset": "illust_special7_2",
+    "label": "Illust Special 7.2"
+  },
+  {
+    "id": "illust_special7_3",
+    "folder": "illust_special7_3",
+    "asset": "illust_special7_3",
+    "label": "Illust Special 7.3"
+  },
+  {
+    "id": "illust_special7_4",
+    "folder": "illust_special7_4",
+    "asset": "illust_special7_4",
+    "label": "Illust Special 7.4"
+  },
+  {
+    "id": "illust_special7_5",
+    "folder": "illust_special7_5",
+    "asset": "illust_special7_5",
+    "label": "Illust Special 7.5"
+  },
+  {
+    "id": "illust_special8",
+    "folder": "illust_special8",
+    "asset": "illust_special8",
+    "label": "Illust Special 8"
+  },
+  {
+    "id": "illust_special9",
+    "folder": "illust_special9",
+    "asset": "illust_special9",
+    "label": "Illust Special 9"
+  },
+  {
+    "id": "illust_special10",
+    "folder": "illust_special10",
+    "asset": "illust_special10",
+    "label": "Illust Special 10"
+  },
+  {
+    "id": "illust_special11",
+    "folder": "illust_special11",
+    "asset": "illust_special11",
+    "label": "Illust Special 11"
+  },
+  {
+    "id": "illust_special12",
+    "folder": "illust_special12",
+    "asset": "illust_special12",
+    "label": "Illust Special 12"
+  },
+  {
+    "id": "illust_special12.atlas",
+    "folder": "illust_special12.atlas",
+    "asset": "illust_special12.atlas",
+    "label": "Illust Special 12 (Alternate)"
+  },
+  {
+    "id": "illust_special13",
+    "folder": "illust_special13",
+    "asset": "illust_special13",
+    "label": "Illust Special 13"
+  },
+  {
+    "id": "illust_special14",
+    "folder": "illust_special14",
+    "asset": "illust_special14",
+    "label": "Illust Special 14"
+  },
+  {
+    "id": "illust_special15",
+    "folder": "illust_special15",
+    "asset": "illust_special15",
+    "label": "Illust Special 15"
+  },
+  {
+    "id": "illust_special16",
+    "folder": "illust_special16",
+    "asset": "illust_special16",
+    "label": "Illust Special 16"
+  },
+  {
+    "id": "illust_special17",
+    "folder": "illust_special17",
+    "asset": "illust_special17",
+    "label": "Illust Special 17"
+  },
+  {
+    "id": "illust_special18",
+    "folder": "illust_special18",
+    "asset": "illust_special18",
+    "label": "Illust Special 18"
+  },
+  {
+    "id": "illust_special19",
+    "folder": "illust_special19",
+    "asset": "illust_special19",
+    "label": "Illust Special 19"
+  },
+  {
+    "id": "illust_special20_1",
+    "folder": "illust_special20_1",
+    "asset": "illust_special20_1",
+    "label": "Illust Special 20.1"
+  },
+  {
+    "id": "illust_special20_2",
+    "folder": "illust_special20_2",
+    "asset": "illust_special20_2",
+    "label": "Illust Special 20.2"
+  },
+  {
+    "id": "illust_special21",
+    "folder": "illust_special21",
+    "asset": "illust_special21",
+    "label": "Illust Special 21"
+  },
+  {
+    "id": "illust_special22",
+    "folder": "illust_special22",
+    "asset": "illust_special22",
+    "label": "Illust Special 22"
+  },
+  {
+    "id": "illust_special23",
+    "folder": "illust_special23",
+    "asset": "illust_special23",
+    "label": "Illust Special 23"
+  },
+  {
+    "id": "illust_special24",
+    "folder": "illust_special24",
+    "asset": "illust_special24",
+    "label": "Illust Special 24"
+  },
+  {
+    "id": "illust_special25",
+    "folder": "illust_special25",
+    "asset": "illust_special25",
+    "label": "Illust Special 25"
+  },
+  {
+    "id": "illust_special52",
+    "folder": "illust_special52",
+    "asset": "illust_special52",
+    "label": "Illust Special 52"
+  },
+  {
+    "id": "specialillust51",
+    "folder": "specialillust51",
+    "asset": "specialIllust51",
+    "label": "Special Illust 51"
+  },
+  {
+    "id": "specialillust60",
+    "folder": "specialillust60",
+    "asset": "specialillust60",
+    "label": "Special Illust 60"
+  },
+  {
+    "id": "specialillust64",
+    "folder": "specialillust64",
+    "asset": "specialillust64",
+    "label": "Special Illust 64"
+  },
+  {
+    "id": "specialillust80",
+    "folder": "specialillust80",
+    "asset": "specialillust80",
+    "label": "Special Illust 80"
+  },
+  {
+    "id": "specialillust116",
+    "folder": "specialillust116",
+    "asset": "specialillust116",
+    "label": "Special Illust 116"
+  },
+  {
+    "id": "specialillust117",
+    "folder": "specialillust117",
+    "asset": "specialillust117",
+    "label": "Special Illust 117"
+  },
+  {
+    "id": "specialillust130",
+    "folder": "specialillust130",
+    "asset": "specialillust130",
+    "label": "Special Illust 130"
+  },
+  {
+    "id": "specialillust131",
+    "folder": "specialillust131",
+    "asset": "specialillust131",
+    "label": "Special Illust 131"
+  },
+  {
+    "id": "specialillust135",
+    "folder": "specialillust135",
+    "asset": "specialillust135",
+    "label": "Special Illust 135"
+  },
+  {
+    "id": "specialillust140",
+    "folder": "specialillust140",
+    "asset": "specialillust140",
+    "label": "Special Illust 140"
+  },
+  {
+    "id": "specialillust143",
+    "folder": "specialillust143",
+    "asset": "specialillust143",
+    "label": "Special Illust 143"
+  },
+  {
+    "id": "specialillust144",
+    "folder": "specialillust144",
+    "asset": "specialillust144",
+    "label": "Special Illust 144"
+  },
+  {
+    "id": "specialillust171",
+    "folder": "specialillust171",
+    "asset": "specialillust171",
+    "label": "Special Illust 171"
+  },
+  {
+    "id": "specialillust175",
+    "folder": "specialillust175",
+    "asset": "specialillust175",
+    "label": "Special Illust 175"
+  },
+  {
+    "id": "specialillust181",
+    "folder": "specialillust181",
+    "asset": "specialillust181",
+    "label": "Special Illust 181"
+  },
+  {
+    "id": "specialillust194",
+    "folder": "specialillust194",
+    "asset": "specialillust194",
+    "label": "Special Illust 194"
+  },
+  {
+    "id": "specialillust195",
+    "folder": "specialillust195",
+    "asset": "specialillust195",
+    "label": "Special Illust 195"
+  },
+  {
+    "id": "specialillust216",
+    "folder": "specialillust216",
+    "asset": "specialillust216",
+    "label": "Special Illust 216"
+  }
+]

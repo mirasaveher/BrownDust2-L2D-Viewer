@@ -4,15 +4,17 @@ import SpinePreview from './components/SpinePreview.vue'
 import characterRegistry from './src/data/character-list.json'
 import characterIcons from './src/utils/charIcons.js'
 import cutsceneMappings from './src/data/cutscene-mappings.json'
+import illustSpecialRegistry from './src/data/illust-special-list.json'
 import {
   Activity, AudioLines, BookOpen, Camera, ChevronDown, ChevronLeft, ChevronRight,
   Clapperboard, CloudUpload, Command, Download, Expand,
-  Eye, EyeOff, Film, FolderOpen, Heart, Image, Layers3, Minimize2, Minus,
+  Eye, EyeOff, Film, FolderOpen, Heart, FileText, Image, Layers3, Minimize2, Minus,
   MoreHorizontal, Pause, Play, Plus, RotateCcw, Search, Settings2, SlidersHorizontal,
   Sparkles, Volume2, WandSparkles, X
 } from 'lucide-vue-next'
 
 const activeTab = ref('viewer')
+const changelogOpen = ref(false)
 function getCharacterFolderName(character, id) {
   if (id === 'ellin') return 'Ellin'
   return [character.charName, character.costumeName].filter(Boolean).join(' ').replace(/\s*\(Npc\)\s*/gi, ' ').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/['’]/g, '').replace(/&/g, ' And ').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').replace(/_+/g, '_')
@@ -35,9 +37,11 @@ const selectedCharacter = ref('003501')
 const characterOpened = ref(false)
 const activeSpineSet = ref('character')
 const datingAnimationSets = ref({})
+const selectedIllustration = ref(illustSpecialRegistry[0]?.id || '')
+const selectedIllustrationData = computed(() => illustSpecialRegistry.find(item => item.id === selectedIllustration.value) || illustSpecialRegistry[0] || null)
 const selectedCharacterData = computed(() => characterRegistry[selectedCharacter.value] || characterRegistry['000101'])
-const selectedCharacterName = computed(() => selectedCharacterData.value.charName)
-const activeCostumeTitle = computed(() => [selectedCharacterData.value.costumeName, selectedCharacterData.value.charName.replace(/\s*\(npc\)$/i, '')].filter(Boolean).join(' '))
+const selectedCharacterName = computed(() => activeSpineSet.value === 'illustration' ? (selectedIllustrationData.value?.label || 'Special Illustrations') : selectedCharacterData.value.charName)
+const activeCostumeTitle = computed(() => activeSpineSet.value === 'illustration' ? (selectedIllustrationData.value?.label || 'Special Illustrations') : [selectedCharacterData.value.costumeName, selectedCharacterData.value.charName.replace(/\s*\(npc\)$/i, '')].filter(Boolean).join(' '))
 const timelineHoverProgress = ref(0)
 const activeComposites = computed(() => activeSpineSet.value === 'ultimate' ? (cutsceneMappings[selectedCharacter.value] || []) : [])
 const characterAssetRoot = computed(() => {
@@ -54,6 +58,10 @@ const activeDatingVariant = computed(() => {
   return keyVariant || multiDatingVariants.value[0] || selectedCharacterData.value.dating || ''
 })
 const activeAssetBase = computed(() => {
+  if (activeSpineSet.value === 'illustration') {
+    const item = selectedIllustrationData.value
+    return item ? `${import.meta.env.BASE_URL}illust_special/${item.folder}/${item.asset}` : ''
+  }
   const character = selectedCharacterData.value
   const root = characterAssetRoot.value
   if (activeSpineSet.value === 'ultimate') return character.cutscene ? root + `cutscene/${character.cutscene}` : ''
@@ -145,6 +153,13 @@ const filteredCharacters = computed(() => {
     return a.charName.localeCompare(b.charName)
   })
 })
+const filteredIllustrations = computed(() => {
+  const query = caseSensitive.value ? search.value.trim() : search.value.trim().toLocaleLowerCase()
+  return illustSpecialRegistry.filter(item => {
+    const value = `${item.label} ${item.id}`
+    return !query || (caseSensitive.value ? value : value.toLocaleLowerCase()).includes(query)
+  }).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }))
+})
 function setAudioLanguage(language) {
   audioLanguage.value = language === 'KR' ? 'KR' : 'JP'
   try { window.localStorage.setItem('browndust2-l2d-viewer-audio-language', audioLanguage.value) } catch { /* Storage may be unavailable. */ }
@@ -158,6 +173,13 @@ function toggleFilter(filter) {
     ? pendingFilters.value.filter((item) => item !== filter)
     : [...pendingFilters.value, filter]
 }
+function toggleCatalogFilter(filter) {
+  if (activeSpineSet.value === 'illustration') {
+    selectSpineSet('character')
+    filtersOpen.value = true
+  }
+  toggleFilter(filter)
+}
 function applyFilters() {
   activeFilters.value = [...pendingFilters.value]
   filtersOpen.value = false
@@ -168,6 +190,7 @@ function resetFilters() {
   search.value = ''
   caseSensitive.value = false
   sortBy.value = 'name-asc'
+  filtersOpen.value = false
 }
 function chooseCharacter(item) {
   skinMenuOpen.value = false
@@ -193,11 +216,44 @@ function backToCharacters() {
   selectedSkin.value = ''
   importError.value = ''
 }
+function selectIllustration(item) {
+  selectedIllustration.value = item.id
+  activeSpineSet.value = 'illustration'
+  activeCatalogMode.value = 'animations'
+  skinMenuOpen.value = false
+  loopPlayback.value = true
+  playing.value = true
+  spineFiles.value = []
+  availableAnimations.value = []
+  selectedAnimation.value = ''
+  availableSkins.value = []
+  selectedSkin.value = ''
+  availableLayers.value = []
+  layerVisibility.value = {}
+  importError.value = ''
+}
 function selectSpineSet(set) {
   skinMenuOpen.value = false
+  if (set === 'illustration') {
+    filtersOpen.value = false
+    if (activeSpineSet.value === set) { activeCatalogMode.value = 'animations'; return }
+    activeSpineSet.value = set
+    activeCatalogMode.value = 'animations'
+    loopPlayback.value = true
+    spineFiles.value = []
+    availableAnimations.value = []
+    selectedAnimation.value = ''
+    availableSkins.value = []
+    selectedSkin.value = ''
+    availableLayers.value = []
+    layerVisibility.value = {}
+    importError.value = ''
+    return
+  }
   if (set === 'ultimate' && !selectedCharacterData.value.cutscene) return
   if (set === 'dating' && !selectedCharacterData.value.dating) return
   if (activeSpineSet.value === set) return
+  filtersOpen.value = false
   activeSpineSet.value = set
   if (set === 'dating') datingAnimationSets.value = {}
   activeCatalogMode.value = 'animations'
@@ -223,6 +279,11 @@ function onFiles(event) {
   selectedAnimation.value = ''
 }
 function onAnimations(names) {
+  if (activeSpineSet.value === 'illustration') {
+    availableAnimations.value = [...new Set((names || []).filter(Boolean))]
+    selectedAnimation.value = availableAnimations.value[0] || ''
+    return
+  }
   if (activeSpineSet.value === 'dating' && multiDatingVariants.value.length > 1) {
     const variant = activeDatingVariant.value || multiDatingVariants.value[0]
     setDatingVariantAnimations(variant, names)
@@ -252,11 +313,10 @@ function onDatingPreloadAnimations(names) {
   setDatingVariantAnimations(datingPreloadVariant.value, names)
 }
 function onSkins(names, initialSkin = '') {
-  const datingSkins = activeSpineSet.value === 'dating' ? [...new Set((names || []).filter(Boolean))] : []
-  availableSkins.value = datingSkins.length > 1 ? datingSkins : []
-  selectedSkin.value = availableSkins.value.includes(initialSkin)
-    ? initialSkin
-    : availableSkins.value[0] || ''
+  const supportsSkinSelection = activeSpineSet.value === 'dating' || activeSpineSet.value === 'illustration'
+  const selectableSkins = supportsSkinSelection ? [...new Set((names || []).filter(Boolean))] : []
+  availableSkins.value = selectableSkins.length > 1 ? selectableSkins : []
+  selectedSkin.value = selectableSkins.includes(initialSkin) ? initialSkin : selectableSkins[0] || initialSkin || ''
 }
 function onLayers(names) {
   availableLayers.value = [...new Set([...availableLayers.value, ...names])].sort((a, b) => a.localeCompare(b))
@@ -388,44 +448,52 @@ onBeforeUnmount(() => {
         <nav class="top-actions" aria-label="Community">
           <a class="topbar-action topbar-action-telegram" href="https://t.me/browndust_2" target="_blank" rel="noopener noreferrer" data-tooltip="Open Telegram channel" aria-label="Open Brown Dust 2 Telegram channel"><img class="topbar-brand-icon topbar-brand-icon-telegram" src="https://telegram.org/img/t_logo.png" alt="" /></a>
           <a class="topbar-action" href="https://github.com/mirasaveher/BrownDust2-L2D-Viewer" target="_blank" rel="noopener noreferrer" data-tooltip="Open GitHub repository" aria-label="Open GitHub repository"><img class="topbar-brand-icon topbar-brand-icon-github" src="https://cdn.simpleicons.org/github/FFFFFF" alt="" /></a>
+          <button type="button" class="topbar-action topbar-changelog-action" data-tooltip="Changelog" aria-label="Open changelog" :aria-expanded="changelogOpen" @click="changelogOpen = true"><FileText :size="20" :stroke-width="2.2" /></button>
         </nav>
       </header>
 
       <section v-if="activeTab === 'viewer'" class="page viewer-page">
         <div class="viewer-heading">
-          <div><div class="eyebrow">BROWN DUST II · CHARACTER LAB</div><h1>{{ selectedCharacterName }}<span class="heading-period">.</span></h1><p>{{ selectedCharacterData.costumeName ? selectedCharacterData.costumeName + " · " : "" }}{{ /^\d+$/.test(selectedCharacter) ? selectedCharacter + " · " : "" }}{{ activeSpineSet === 'character' ? 'Standard animations' : activeSpineSet === 'ultimate' ? 'Ultimate animation' : 'Fated Guest' }}</p></div>
-          <div class="viewer-heading-actions"><span class="gallery-count">{{ characters.length }} CHARACTERS</span><button class="button-secondary" @click="showImport = true"><Plus :size="15" /> Import assets</button></div>
+          <div><div class="eyebrow">BROWN DUST II · {{ activeSpineSet === 'illustration' ? 'ILLUSTRATION LAB' : 'CHARACTER LAB' }}</div><h1>{{ selectedCharacterName }}<span class="heading-period">.</span></h1><p>{{ activeSpineSet === 'illustration' ? 'Special illustrations · Spine animation' : (selectedCharacterData.costumeName ? selectedCharacterData.costumeName + ' · ' : '') + (/^\d+$/.test(selectedCharacter) ? selectedCharacter + ' · ' : '') + (activeSpineSet === 'character' ? 'Standard animations' : activeSpineSet === 'ultimate' ? 'Ultimate animation' : 'Fated Guest') }}</p></div>
+          <div class="viewer-heading-actions"><span class="gallery-count">{{ activeSpineSet === 'illustration' ? illustSpecialRegistry.length + ' ILLUSTRATIONS' : characters.length + ' CHARACTERS' }}</span><button class="button-secondary" @click="showImport = true"><Plus :size="15" /> Import assets</button></div>
         </div>
         <div class="studio-layout">
           <aside class="catalog-panel">
-            <div ref="filtersAreaRef" class="catalog-search-row"><div class="catalog-search catalog-search-compact"><Search :size="16" /><input v-model="search" placeholder="Search..." aria-label="Search characters" /><button v-if="search" class="clear-search" data-tooltip="Clear search" @click="search = ''"><X :size="14" /></button></div>
+            <div ref="filtersAreaRef" class="catalog-search-row"><div class="catalog-search catalog-search-compact"><Search :size="16" /><input v-model="search" :placeholder="activeSpineSet === 'illustration' ? 'Search illustrations...' : 'Search...'" :aria-label="activeSpineSet === 'illustration' ? 'Search illustrations' : 'Search characters'" /><button v-if="search" class="clear-search" data-tooltip="Clear search" @click="search = ''"><X :size="14" /></button></div>
             <button class="catalog-filter-trigger" :class="{ active: filtersOpen || activeFilters.length }" aria-label="Open filters" :aria-expanded="filtersOpen" @click="openFilters"><SlidersHorizontal :size="15" /><span>Filters</span><i v-if="activeFilters.length">{{ activeFilters.length }}</i></button>
             
             <div v-if="filtersOpen" class="catalog-filter-popover">
               <div class="catalog-filter-popover-head"><strong>Filters & sorting</strong></div>
               <div class="filter-chips filter-chips-vertical">
-                <button v-for="filter in [{ id: 'FG', label: 'Fated Guest' }, { id: 'U', label: 'Ultimate' }, { id: 'PC', label: 'Playable Characters' }, { id: 'NPC', label: 'NPCs' }]" :key="filter.id" class="filter-chip" :class="{ active: pendingFilters.includes(filter.id), ['filter-' + filter.id.toLowerCase()]: true }" :aria-pressed="activeFilters.includes(filter.id)" @click="toggleFilter(filter.id)"><span>{{ filter.id }}</span>{{ filter.label }}</button>
+                <button v-for="filter in [{ id: 'FG', label: 'Fated Guest' }, { id: 'U', label: 'Ultimate' }, { id: 'PC', label: 'Playable Characters' }, { id: 'NPC', label: 'NPCs' }]" :key="filter.id" class="filter-chip" :class="{ active: pendingFilters.includes(filter.id), ['filter-' + filter.id.toLowerCase()]: true }" :aria-pressed="pendingFilters.includes(filter.id)" @click="toggleCatalogFilter(filter.id)"><span>{{ filter.id }}</span>{{ filter.label }}</button>
+                <button type="button" class="filter-chip special-illustration-filter" :class="{ active: activeSpineSet === 'illustration' }" :aria-pressed="activeSpineSet === 'illustration'" @click="selectSpineSet('illustration')"><span class="special-illustration-icon" aria-hidden="true">SI</span>Special Illustrations<i v-if="activeSpineSet === 'illustration'"></i></button>
               </div>
-              <div class="filter-popover-footer"><button class="filter-reset-button" :disabled="!activeFilters.length && !pendingFilters.length && !search && !caseSensitive && sortBy === 'name-asc'" @click="resetFilters"><RotateCcw :size="14" /><span>Reset</span></button><button class="filter-apply-button" @click="applyFilters">Apply filters</button></div>
+              <div class="filter-popover-footer"><button type="button" class="filter-reset-button" :disabled="!activeFilters.length && !pendingFilters.length && !search && !caseSensitive && sortBy === 'name-asc'" @pointerdown.stop @click.stop.prevent="resetFilters"><RotateCcw :size="14" /><span>Reset</span></button><button class="filter-apply-button" @click="applyFilters">Apply filters</button></div>
             </div></div>
-            <div class="catalog-list-heading"><span>CHARACTER LIST</span><span>{{ filteredCharacters.length }} ITEMS</span></div>
-            <div class="catalog-character-list">
+            <div class="catalog-list-heading"><span>{{ activeSpineSet === 'illustration' ? 'SPECIAL ILLUSTRATIONS' : 'CHARACTER LIST' }}</span><span>{{ activeSpineSet === 'illustration' ? filteredIllustrations.length + ' ITEMS' : filteredCharacters.length + ' ITEMS' }}</span></div>
+            <div v-if="activeSpineSet !== 'illustration'" class="catalog-character-list">
               <button v-for="item in filteredCharacters" :key="item.id" class="catalog-character" :class="{ selected: selectedCharacter === item.id }" @click="chooseCharacter(item)">
                 <span class="catalog-avatar"><img :src="item.icon" :alt="`${item.displayName} icon`" loading="lazy" /></span><span class="catalog-character-info"><strong>{{ item.displayName }}</strong><small>{{ item.costumeName ? item.costumeName + (/^\\d+$/.test(item.id) ? " · " : "") : "" }}{{ /^\\d+$/.test(item.id) ? item.id : "" }}</small><span class="catalog-tags"><i v-if="item.hasDating" class="tag-fg">FG</i><i v-if="item.hasUltimate" class="tag-ultimate">U</i><i v-if="item.isNpc" class="tag-npc">NPC</i></span></span><span v-if="selectedCharacter === item.id" class="selected-dot"></span>
               </button>
               <div v-if="!filteredCharacters.length" class="gallery-empty">No characters found.</div>
+            </div>
+            <div v-else class="catalog-character-list">
+              <button v-for="item in filteredIllustrations" :key="item.id" class="catalog-character" :class="{ selected: selectedIllustration === item.id }" @click="selectIllustration(item)">
+                <span class="catalog-avatar special-illustration-avatar"><Image :size="18" /></span><span class="catalog-character-info"><strong>{{ item.label }}</strong><span class="catalog-tags"><i class="tag-ultimate">SPINE</i></span></span><span v-if="selectedIllustration === item.id" class="selected-dot"></span>
+              </button>
+              <div v-if="!filteredIllustrations.length" class="gallery-empty">No illustrations found.</div>
             </div>
             <div class="catalog-animation-section">
               <div class="catalog-list-heading"><span>{{ activeCatalogMode === 'animations' ? 'ANIMATION SET' : 'LAYERS' }}</span><span>{{ activeCatalogMode === 'animations' ? availableAnimations.length + ' ANIMATIONS' : availableLayers.length + ' LAYERS' }}</span></div>
               <div class="catalog-category-row">
                 <div class="catalog-category-list">
                   <button class="category-option set-standard" :class="{ selected: activeSpineSet === 'character' }" @click="activeCatalogMode = 'animations'; selectSpineSet('character')"><Activity :size="15" /><span>Standard</span><i v-if="activeSpineSet === 'character'"></i></button>
-                  <button v-if="selectedCharacterData.cutscene" class="category-option set-ultimate" :class="{ selected: activeSpineSet === 'ultimate' }" @click="activeCatalogMode = 'animations'; selectSpineSet('ultimate')"><Film :size="15" /><span>Ultimate</span><i v-if="activeSpineSet === 'ultimate'"></i></button>
-                  <button v-if="selectedCharacterData.dating" class="category-option set-fg" :class="{ selected: activeSpineSet === 'dating' }" @click="activeCatalogMode = 'animations'; selectSpineSet('dating')"><BookOpen :size="15" /><span>Fated Guest</span><i v-if="activeSpineSet === 'dating'"></i></button>
+                  <button v-if="selectedCharacterData.cutscene && activeSpineSet !== 'illustration'" class="category-option set-ultimate" :class="{ selected: activeSpineSet === 'ultimate' }" @click="activeCatalogMode = 'animations'; selectSpineSet('ultimate')"><Film :size="15" /><span>Ultimate</span><i v-if="activeSpineSet === 'ultimate'"></i></button>
+                  <button v-if="selectedCharacterData.dating && activeSpineSet !== 'illustration'" class="category-option set-fg" :class="{ selected: activeSpineSet === 'dating' }" @click="activeCatalogMode = 'animations'; selectSpineSet('dating')"><BookOpen :size="15" /><span>Fated Guest</span><i v-if="activeSpineSet === 'dating'"></i></button>
                 </div>
                 <button class="category-option layers-tab set-layers" :class="{ selected: activeCatalogMode === 'layers' }" :aria-pressed="activeCatalogMode === 'layers'" @click="activeCatalogMode = activeCatalogMode === 'layers' ? 'animations' : 'layers'"><Layers3 :size="16" /><span>Layers</span><i v-if="activeCatalogMode === 'layers'"></i></button>
               </div>
-              <div v-if="activeCatalogMode === 'animations' && activeSpineSet === 'dating' && availableSkins.length > 1" class="skins-control">
+              <div v-if="activeCatalogMode === 'animations' && (activeSpineSet === 'dating' || activeSpineSet === 'illustration') && availableSkins.length > 1" class="skins-control">
                 <div class="skins-control-heading"><span>SKINS</span></div>
                 <div class="skins-select-wrap">
                   <button class="skins-select" type="button" aria-label="Choose model skin" :aria-expanded="skinMenuOpen" @click="skinMenuOpen = !skinMenuOpen">
@@ -438,7 +506,7 @@ onBeforeUnmount(() => {
                 
               </div>
               <div v-if="activeCatalogMode === 'animations'" class="catalog-animation-list">
-                <button v-for="name in availableAnimations" :key="name" class="catalog-animation" :class="{ selected: selectedAnimation === name }" @click="selectedAnimation = name"><Activity :size="13" /><span>{{ datingAnimationCatalog.find(item => item.key === name)?.label || name }}</span><i v-if="selectedAnimation === name"></i></button>
+                <button v-for="name in availableAnimations" :key="name" class="catalog-animation" :class="{ selected: selectedAnimation === name }" @click="selectedAnimation = name"><span>{{ datingAnimationCatalog.find(item => item.key === name)?.label || name }}</span><i v-if="selectedAnimation === name"></i></button>
                 <div v-if="!availableAnimations.length" class="animation-empty">Loading animations…</div>
               </div>
               <div v-else class="catalog-layers-view">
@@ -450,8 +518,12 @@ onBeforeUnmount(() => {
                 <div class="layers-actions"><button @click="setAllLayers(true)">Show all</button><button @click="setAllLayers(false)">Hide all</button></div>
                 <div v-if="availableLayers.length" class="layers-list">
                   <label v-for="name in filteredLayers" :key="name" class="layer-item">
-                    <input type="checkbox" :checked="layerVisibility[name] !== false" @change="toggleLayer(name)" />
-                    <span>{{ name }}</span><span class="layer-visibility-indicator" :class="{ hidden: layerVisibility[name] === false }" :aria-label="layerVisibility[name] === false ? 'Hidden' : 'Visible'"><Eye v-if="layerVisibility[name] !== false" :size="13" /><EyeOff v-else :size="13" /></span>
+                    <span class="layer-name">{{ name }}</span>
+                    <input class="layer-checkbox" type="checkbox" :checked="layerVisibility[name] !== false" :aria-label="`${layerVisibility[name] === false ? 'Show' : 'Hide'} ${name}`" @change="toggleLayer(name)" />
+                    <span class="layer-visibility-indicator" :class="{ hidden: layerVisibility[name] === false }" aria-hidden="true">
+                      <Eye v-if="layerVisibility[name] !== false" :size="15" />
+                      <EyeOff v-else :size="15" />
+                    </span>
                   </label>
                   <div v-if="!filteredLayers.length" class="animation-empty">No matching layers.</div>
                 </div>
@@ -460,11 +532,11 @@ onBeforeUnmount(() => {
             </div>
           </aside>
           <section ref="stageRef" class="stage-panel" :class="{ 'controls-hidden': isFullscreen && fullscreenControlsHidden }">
-            <div class="panel-topline"><div class="panel-label"><span class="live-indicator"></span> {{ activeCostumeTitle }} <span class="muted-tag" :class="activeSpineSet === 'character' ? 'tag-standard' : activeSpineSet === 'ultimate' ? 'tag-ultimate' : 'tag-fg'">{{ activeSpineSet === 'character' ? 'STANDART' : activeSpineSet === 'ultimate' ? 'ULTIMATE' : 'FATED GUEST' }}</span></div><div class="stage-actions"><span class="zoom-readout">{{ previewScale }}%</span><button class="icon-button" data-tooltip="Reset position and zoom" aria-label="Reset position and zoom" @click="spinePreviewRef?.resetView?.()"><RotateCcw :size="15" /></button><button class="icon-button" aria-label="Zoom out" @click="spinePreviewRef?.zoomOut?.()"><Minus :size="15" /></button><button class="icon-button" aria-label="Zoom in" @click="spinePreviewRef?.zoomIn?.()"><Plus :size="15" /></button></div></div>
+            <div class="panel-topline"><div class="panel-label"><span class="live-indicator"></span> {{ activeCostumeTitle }} <span class="muted-tag" :class="activeSpineSet === 'character' ? 'tag-standard' : activeSpineSet === 'ultimate' ? 'tag-ultimate' : activeSpineSet === 'dating' ? 'tag-fg' : 'tag-standard'" :style="activeSpineSet === 'illustration' ? { color: '#9fe7dc', borderColor: '#3f8f8b', background: '#193a3b' } : null">{{ activeSpineSet === 'character' ? 'STANDART' : activeSpineSet === 'ultimate' ? 'ULTIMATE' : activeSpineSet === 'dating' ? 'FATED GUEST' : 'SPECIAL ILLUSTRATIONS' }}</span></div><div class="stage-actions"><span class="zoom-readout">{{ previewScale }}%</span><button class="icon-button" data-tooltip="Reset position and zoom" aria-label="Reset position and zoom" @click="spinePreviewRef?.resetView?.()"><RotateCcw :size="15" /></button><button class="icon-button" aria-label="Zoom out" @click="spinePreviewRef?.zoomOut?.()"><Minus :size="15" /></button><button class="icon-button" aria-label="Zoom in" @click="spinePreviewRef?.zoomIn?.()"><Plus :size="15" /></button></div></div>
             <div class="stage stage-large" :class="selectedCharacterName.toLowerCase()" >
               <div class="stage-grid"></div><div class="orb orb-one"></div><div class="orb orb-two"></div>
               <div class="stage-watermark"><Sparkles :size="15" /> BROWNDUST2 L2D VIEWER</div>
-              <SpinePreview ref="spinePreviewRef" :files="spineFiles" :asset-base="activeAssetBase" :animation="previewAnimation" :skin="selectedSkin" :composites="activeComposites" :dating-tracks="activeSpineSet === 'dating' && selectedCharacterData.datingUsesTracks" :playing="playing" :loop="loopPlayback" :scale="previewScale" :speed="playbackSpeed" :use-current-camera="useCurrentCameraForExport" :audio-base="activeSpineSet === 'character' ? selectedAudioBase : ''" @animations="onAnimations" @skins="onSkins" @layers="onLayers" @error="onSpineError" @progress="playbackProgress = $event" @duration="animationDuration = $event" @zoom="previewScale = $event" />
+              <SpinePreview ref="spinePreviewRef" :files="spineFiles" :asset-base="activeAssetBase" :first-animation="activeSpineSet === 'illustration'" :animation="previewAnimation" :skin="selectedSkin" :composites="activeComposites" :dating-tracks="activeSpineSet === 'dating' && selectedCharacterData.datingUsesTracks" :playing="playing" :loop="loopPlayback" :scale="previewScale" :speed="playbackSpeed" :use-current-camera="useCurrentCameraForExport" :audio-base="activeSpineSet === 'character' ? selectedAudioBase : ''" @animations="onAnimations" @skins="onSkins" @layers="onLayers" @error="onSpineError" @progress="playbackProgress = $event" @duration="animationDuration = $event" @zoom="previewScale = $event" />
               <div v-if="activeSpineSet === 'dating' && datingPreloadAssetBase" style="position:fixed;left:-10000px;top:0;width:640px;height:480px;opacity:0;pointer-events:none;z-index:-1" aria-hidden="true">
                 <SpinePreview :asset-base="datingPreloadAssetBase" animation="" :dating-tracks="true" :playing="false" :loop="true" :scale="100" :speed="1" @animations="onDatingPreloadAnimations" />
               </div>
@@ -487,6 +559,27 @@ onBeforeUnmount(() => {
       </section>
     </main>
 
+    <div v-if="changelogOpen" class="modal-backdrop changelog-backdrop" @click.self="changelogOpen = false">
+      <section class="changelog-modal" role="dialog" aria-modal="true" aria-labelledby="changelog-title">
+        <div class="modal-heading">
+          <div><div class="eyebrow">BROWN DUST 2 · L2D VIEWER</div><h2 id="changelog-title">Changelog</h2></div>
+          <button type="button" class="icon-button" aria-label="Close changelog" @click="changelogOpen = false"><X :size="18" /></button>
+        </div>
+        <div class="changelog-content">
+          <div class="changelog-scroll-area">
+            <article class="changelog-entry">
+              <div class="changelog-entry-meta"><time datetime="2026-11-05">05/11/2026</time><span class="changelog-tag tag-new">NEW</span></div>
+              <div class="changelog-entry-copy">
+                <p>All special illustrations have been added and are now available under the Filters section.</p>
+                <p>Added animations and cutscenes for Night of Betrayal Valze.</p>
+                <p>Added animations and cutscenes for Liatris Sweet Temptation special skin.</p>
+                <p>Various UI improvements and minor bug fixes.</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+    </div>
     <div v-if="showImport" class="modal-backdrop" @click.self="showImport = false">
       <div class="import-modal"><div class="modal-heading"><div><div class="eyebrow">ASSET MANAGER</div><h2>Import character files</h2></div><button class="icon-button" @click="showImport = false"><X :size="18" /></button></div>
         <label class="drop-zone"><input type="file" multiple accept=".skel,.json,.atlas,.png,.webp" @change="onFiles" /><span class="upload-icon"><CloudUpload :size="23" /></span><strong>Choose files to import</strong><small>Drop files here or browse your device</small><em>Выбери .atlas, .skel/.json и все связанные .png/.webp текстуры.</em></label>

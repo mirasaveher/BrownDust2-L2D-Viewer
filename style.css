@@ -290,8 +290,9 @@ html,body,#app{height:100%;overflow:hidden}
 .layers-list { display: grid; gap: 2px; max-height: 220px; overflow-y: auto; }
 .layer-item { min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 7px; border-radius: 5px; color: #c8c2d1; font-size: 11px; cursor: pointer; }
 .layer-item:hover { background: #272330; }
-.layer-item input { width: 14px; height: 14px; accent-color: #a78bfa; flex: 0 0 auto; }
-.layer-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-item .layer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-item .layer-checkbox { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.layer-item .layer-checkbox:focus-visible + .layer-visibility-indicator { outline: 2px solid #8fe0b4; outline-offset: 2px; }
 .layer-item > svg { color: #a995e8; flex: 0 0 auto; }
 .layer-item > .layer-hidden-icon { color: #6e6878; }
 .stage-large:fullscreen .spine-preview, .stage-large:fullscreen .spine-preview-host { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -330,7 +331,6 @@ html,body,#app{height:100%;overflow:hidden}
 .layers-popover .layers-actions button { font-size: 11px; }
 .layers-popover .layers-list { max-height: min(42vh, 360px); }
 .layers-popover .layer-item { font-size: 12px; padding: 8px 7px; }
-.layers-popover .layer-item input { width: 16px; height: 16px; }
 .catalog-animation-list { max-height: none; min-height: 100px; }
 .catalog-animation { min-height: 36px; padding: 8px 10px; font-size: 12px; }
 .catalog-animation > svg { width: 15px; height: 15px; }
@@ -383,7 +383,6 @@ html,body,#app{height:100%;overflow:hidden}
   overflow-y: auto;
 }
 .catalog-layers-view .layer-item { min-height: 34px; font-size: 12px; }
-.catalog-layers-view .layer-item input { width: 16px; height: 16px; }
 .layers-menu-wrap, .layers-trigger, .layers-popover, .layers-panel { display: none !important; }
 .stage-large .spine-preview-host canvas {
   touch-action: none !important;
@@ -1516,4 +1515,216 @@ button:focus-visible {
 .panel-topline [data-tooltip]:hover::after,
 .panel-topline [data-tooltip]:focus-visible::after {
   transform: translate(-50%, 0);
+}
+
+
+/* Special Illustration has a distinct SI monogram badge within the shared filter-chip layout. */
+.special-illustration-filter .special-illustration-icon {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 23px;
+  min-width: 23px;
+  height: 19px;
+  padding: 0;
+  border: 1px solid #3f8f8b;
+  border-radius: 4px;
+  background: #193a3b;
+  color: #9fe7dc;
+  font: 700 9px 'DM Mono', monospace;
+  letter-spacing: -.4px;
+  line-height: 1;
+  box-shadow: 0 0 0 1px #3f8f8b22;
+}
+.special-illustration-filter:hover .special-illustration-icon {
+  border-color: #65b9b0;
+  background: #204746;
+  color: #c9fff6;
+}
+.special-illustration-filter.active {
+  border-color: #4faaa1;
+  background: #203b3b;
+  color: #d9fff8;
+}
+.special-illustration-filter.active .special-illustration-icon {
+  border-color: #79d9ce;
+  background: #24504e;
+  color: #effffc;
+  box-shadow: 0 0 0 1px #79d9ce44, 0 0 8px #55c8bb22;
+}
+.special-illustration-filter>i{margin-left:auto;width:5px;height:5px;flex:0 0 5px;border-radius:50%;background:#79d9ce}
+
+
+/* Match every animation-row icon to the Special Illustration filter icon. */
+.catalog-animation > svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  color: #c5b0f0;
+}
+
+
+/* Use the same Special Illustration symbol in place of character avatars. */
+.catalog-avatar.special-illustration-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c5b0f0;
+}
+.catalog-avatar.special-illustration-avatar svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+
+/* Changelog header action and compact update panel. */
+.topbar-changelog-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid #51416c;
+  background: linear-gradient(145deg, #30263e, #211f28);
+  color: #c9b2ed;
+  box-shadow: inset 0 0 0 1px #a78bfa0a, 0 3px 12px #0004;
+}
+.topbar-changelog-action:hover,
+.topbar-changelog-action.active {
+  border-color: #9272c2;
+  background: linear-gradient(145deg, #49385f, #30263e);
+  color: #f2eaff;
+}
+.topbar-changelog-action svg { display: block; flex: 0 0 auto; }
+.changelog-backdrop { z-index: 300; }
+.changelog-modal {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 32px));
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid #40394e;
+  border-radius: 13px;
+  background: #191720;
+  box-shadow: 0 24px 80px #000b;
+  color: #e9e5f0;
+}
+.changelog-modal .modal-heading { margin-bottom: 20px; }
+.changelog-modal .modal-heading h2 { margin: 6px 0 0; font: 700 24px Manrope, sans-serif; letter-spacing: -.7px; }
+.changelog-content { display: grid; gap: 14px; }
+.changelog-intro { display: flex; align-items: center; min-height: 34px; }
+.changelog-intro strong { display: block; color: #eeeaf5; font-size: 12px; }
+.changelog-scroll-area {
+  box-sizing: border-box;
+  min-height: 280px;
+  max-height: min(440px, calc(100vh - 250px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #43885f #211e29;
+  padding: 2px 8px 2px 2px;
+}
+.changelog-scroll-area::-webkit-scrollbar { width: 8px; }
+.changelog-scroll-area::-webkit-scrollbar-track { border-radius: 8px; background: #211e29; }
+.changelog-scroll-area::-webkit-scrollbar-thumb { border: 2px solid #211e29; border-radius: 8px; background: #43885f; }
+.changelog-scroll-area::-webkit-scrollbar-thumb:hover { background: #59a977; }
+.changelog-entry {
+  padding: 13px 14px 14px;
+  border: 1px solid #393344;
+  border-radius: 9px;
+  background: #211e29;
+}
+.changelog-entry-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #938c9f;
+  font: 700 9px 'DM Mono', monospace;
+  letter-spacing: .5px;
+}
+.changelog-entry-meta time { font-variant-numeric: tabular-nums; }
+.changelog-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 19px;
+  padding: 0 7px;
+  border: 1px solid #43885f;
+  border-radius: 4px;
+  background: #1c3828;
+  color: #9de0ae;
+  font: 700 8px 'DM Mono', monospace;
+  letter-spacing: .4px;
+}
+.changelog-entry-copy {
+  display: grid;
+  gap: 9px;
+  margin-top: 13px;
+  color: #c1bbc9;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.changelog-entry-copy p {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  align-items: start;
+  margin: 0;
+}
+.changelog-entry-copy p::before {
+  content: "•";
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.45;
+}
+@media (max-width: 600px) {
+  .changelog-modal { padding: 17px; }
+  .changelog-modal .modal-heading h2 { font-size: 21px; }
+}
+
+
+/* Final Changelog alignment and icon contrast refinements. */
+.changelog-modal .modal-heading {
+  align-items: flex-start;
+}
+.changelog-modal .modal-heading h2 {
+  margin-top: 4px;
+  line-height: 1.2;
+}
+.changelog-intro {
+  min-height: 0;
+  align-items: center;
+}
+.changelog-intro strong {
+  line-height: 1.2;
+}
+.changelog-scroll-area {
+  padding-left: 0;
+}
+.topbar-changelog-action {
+  color: #fff;
+  background: #211f28;
+  border-color: #393642;
+  box-shadow: none;
+}
+.topbar-changelog-action:hover,
+.topbar-changelog-action:focus-visible {
+  color: #fff;
+  border-color: #8068ad;
+  background: #30263e;
+}
+.topbar-changelog-action svg {
+  color: #fff;
+  stroke: currentColor;
+}
+
+
+/* Changelog title spacing and update text size. */
+.changelog-modal .modal-heading .eyebrow {
+  margin-bottom: 9px;
+}
+.changelog-modal .modal-heading h2 {
+  margin-top: 0;
+}
+.changelog-entry-copy {
+  font-size: 12px;
+  line-height: 1.65;
 }
