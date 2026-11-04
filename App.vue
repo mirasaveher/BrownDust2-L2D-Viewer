@@ -15,6 +15,7 @@ import {
 
 const activeTab = ref('viewer')
 const changelogOpen = ref(false)
+const assetBaseUrl = import.meta.env.VITE_ASSET_BASE_URL || import.meta.env.BASE_URL
 function getCharacterFolderName(character, id) {
   if (id === 'ellin') return 'Ellin'
   return [character.charName, character.costumeName].filter(Boolean).join(' ').replace(/\s*\(Npc\)\s*/gi, ' ').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/['’]/g, '').replace(/&/g, ' And ').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').replace(/_+/g, '_')
@@ -47,7 +48,7 @@ const activeComposites = computed(() => activeSpineSet.value === 'ultimate' ? (c
 const characterAssetRoot = computed(() => {
   const character = selectedCharacterData.value
   const folderName = getCharacterFolderName(character, selectedCharacter.value)
-  return `${import.meta.env.BASE_URL}${selectedCharacter.value}/${folderName}/`
+  return `${assetBaseUrl}${selectedCharacter.value}/${folderName}/`
 })
 const multiDatingVariants = computed(() => selectedCharacterData.value.datingVariants || [])
 const datingPreloadVariant = computed(() => multiDatingVariants.value[1] || '')
@@ -60,7 +61,7 @@ const activeDatingVariant = computed(() => {
 const activeAssetBase = computed(() => {
   if (activeSpineSet.value === 'illustration') {
     const item = selectedIllustrationData.value
-    return item ? `${import.meta.env.BASE_URL}illust_special/${item.folder}/${item.asset}` : ''
+    return item ? `${assetBaseUrl}illust_special/${item.folder}/${item.asset}` : ''
   }
   const character = selectedCharacterData.value
   const root = characterAssetRoot.value
@@ -74,7 +75,7 @@ const selectedAudioBase = computed(() => {
   const character = selectedCharacterData.value
   if (!character.audio || !/^\d+(?:_c)?$/i.test(selectedCharacter.value)) return ''
   const folderName = getCharacterFolderName(character, selectedCharacter.value)
-  return `${import.meta.env.BASE_URL}${selectedCharacter.value}/${folderName}/${audioLanguage.value}/${character.audio}`
+  return `${assetBaseUrl}${selectedCharacter.value}/${folderName}/${audioLanguage.value}/${character.audio}`
 })
 const selectedMotion = ref('Idle')
 const playing = ref(true)
