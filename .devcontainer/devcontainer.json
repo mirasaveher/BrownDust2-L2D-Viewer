@@ -1,0 +1,4 @@
+{
+  "name": "BrownDust2 L2D Viewer",
+  "postStartCommand": "bash .devcontainer/start-dev.sh"
+}

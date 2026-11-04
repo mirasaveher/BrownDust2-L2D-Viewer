@@ -1,0 +1,23 @@
+{
+  "name": "browndust2-l2d-viewer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config vite.config.mjs --host 0.0.0.0 --port 5173 --strictPort",
+    "build": "vite build --config vite.config.mjs",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "lucide-vue-next": "^0.468.0",
+    "vue": "^3.5.13",
+    "@esotericsoftware/spine-player": "4.1.55",
+    "jszip": "^3.10.1",
+    "mediabunny": "^1.56.1",
+    "gifenc": "^1.0.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^6.0.7"
+  }
+}
