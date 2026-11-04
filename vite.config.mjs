@@ -55,7 +55,7 @@ function serveExtraPublicDirs(server) {
       let statusCode = 200
 
       if (range) {
-        const match = /^bytes=(\\d*)-(\\d*)$/.exec(range)
+        const match = /^bytes=(\d*)-(\d*)$/.exec(range)
         if (!match) {
           res.statusCode = 416
           res.setHeader('Content-Range', `bytes */${fileStats.size}`)
