@@ -359,6 +359,14 @@
     "dating": "",
     "audio": ""
   },
+  "400101": {
+    "charName": "Unknown NPC (Npc)",
+    "costumeName": "",
+    "spine": "npc400101",
+    "cutscene": "",
+    "dating": "",
+    "audio": ""
+  },
   "400135": {
     "charName": "Young Justia (Npc)",
     "costumeName": "",
