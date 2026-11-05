@@ -34,7 +34,7 @@ const activeCatalogMode = ref('animations')
 const availableLayers = ref([])
 const layerVisibility = ref({})
 const sortBy = ref('name-asc')
-const selectedCharacter = ref('003501')
+const selectedCharacter = ref('068001')
 const characterOpened = ref(false)
 const activeSpineSet = ref('character')
 const datingAnimationSets = ref({})
@@ -148,6 +148,11 @@ const filteredCharacters = computed(() => {
     return matchesSearch && matchesFilters
   })
   return filtered.sort((a, b) => {
+    const priority = ['068001', '001297']
+    const priorityDifference = priority.indexOf(a.id) - priority.indexOf(b.id)
+    if (priorityDifference !== 0 && (priority.includes(a.id) || priority.includes(b.id))) {
+      return priority.indexOf(a.id) === -1 ? 1 : priority.indexOf(b.id) === -1 ? -1 : priorityDifference
+    }
     if (sortBy.value === 'name-desc') return b.charName.localeCompare(a.charName)
     if (sortBy.value === 'id-asc') return a.id.localeCompare(b.id, undefined, { numeric: true })
     if (sortBy.value === 'id-desc') return b.id.localeCompare(a.id, undefined, { numeric: true })
@@ -474,7 +479,7 @@ onBeforeUnmount(() => {
             <div class="catalog-list-heading"><span>{{ activeSpineSet === 'illustration' ? 'SPECIAL ILLUSTRATIONS' : 'CHARACTER LIST' }}</span><span>{{ activeSpineSet === 'illustration' ? filteredIllustrations.length + ' ITEMS' : filteredCharacters.length + ' ITEMS' }}</span></div>
             <div v-if="activeSpineSet !== 'illustration'" class="catalog-character-list">
               <button v-for="item in filteredCharacters" :key="item.id" class="catalog-character" :class="{ selected: selectedCharacter === item.id }" @click="chooseCharacter(item)">
-                <span class="catalog-avatar"><img :src="item.icon" :alt="`${item.displayName} icon`" loading="lazy" /></span><span class="catalog-character-info"><strong>{{ item.displayName }}</strong><small>{{ item.costumeName ? item.costumeName + (/^\\d+$/.test(item.id) ? " · " : "") : "" }}{{ /^\\d+$/.test(item.id) ? item.id : "" }}</small><span class="catalog-tags"><i v-if="item.hasDating" class="tag-fg">FG</i><i v-if="item.hasUltimate" class="tag-ultimate">U</i><i v-if="item.isNpc" class="tag-npc">NPC</i></span></span><span v-if="selectedCharacter === item.id" class="selected-dot"></span>
+                <span class="catalog-avatar"><img :src="item.icon" :alt="`${item.displayName} icon`" loading="lazy" /></span><span class="catalog-character-info"><strong>{{ item.displayName }}</strong><small>{{ item.costumeName ? item.costumeName + (/^\\d+$/.test(item.id) ? " · " : "") : "" }}{{ /^\\d+$/.test(item.id) ? item.id : "" }}</small><span class="catalog-tags"><i v-if="item.hasDating" class="tag-fg">FG</i><i v-if="item.hasUltimate" class="tag-ultimate">U</i><i v-if="item.isNpc" class="tag-npc">NPC</i></span></span><span class="catalog-character-end"><span v-if="selectedCharacter === item.id" class="selected-dot"></span><span v-if="['068001', '001297'].includes(item.id)" class="catalog-new-badge">NEW</span></span>
               </button>
               <div v-if="!filteredCharacters.length" class="gallery-empty">No characters found.</div>
             </div>

@@ -359,14 +359,6 @@
     "dating": "",
     "audio": ""
   },
-  "400123": {
-    "charName": "Valze (Npc)",
-    "costumeName": "",
-    "spine": "npc400123",
-    "cutscene": "",
-    "dating": "",
-    "audio": ""
-  },
   "400135": {
     "charName": "Young Justia (Npc)",
     "costumeName": "",
@@ -1899,6 +1891,22 @@
     "costumeName": "Slap Slap Pop",
     "spine": "RhythmHitAnim",
     "cutscene": "",
+    "dating": "",
+    "audio": ""
+  },
+  "001297": {
+    "charName": "Liatris",
+    "costumeName": "Sweet Temptation",
+    "spine": "char001297",
+    "cutscene": "cutscene_char001297",
+    "dating": "",
+    "audio": ""
+  },
+  "068001": {
+    "charName": "Valze",
+    "costumeName": "Night of Betrayal",
+    "spine": "char068001",
+    "cutscene": "cutscene_char068001",
     "dating": "",
     "audio": ""
   }
