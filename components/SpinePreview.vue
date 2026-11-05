@@ -49,6 +49,7 @@ function createGifSample(source,sampleCanvas,sampleContext) {
 const props = defineProps({
   files: { type: Array, default: () => [] },
   assetBase: { type: String, default: '' },
+  firstAnimation: { type: Boolean, default: false },
   animation: { type: String, default: '' },
   skin: { type: String, default: '' },
   composites: { type: Array, default: () => [] },
@@ -714,10 +715,11 @@ function handleSuccess(instance, token) {
   emit('skins', skinNames, initialSkin)
   emit('layers', (instance.skeleton?.slots || []).map((slot) => slot.data?.name).filter(Boolean))
 
-  const initial = props.datingTracks
-    ? names.find((name) => /^mix\d+$/i.test(name)) || names.find((name) => name.toLowerCase() === 'idle') || names[0]
-    : names.find((name) => name.toLowerCase() === 'idle')
-      || names[0]
+  const initial = props.firstAnimation
+    ? names[0]
+    : props.datingTracks
+      ? names.find((name) => /^mix\d+$/i.test(name)) || names.find((name) => name.toLowerCase() === 'idle') || names[0]
+      : names.find((name) => name.toLowerCase() === 'idle') || names[0]
   if (initial) applyAnimation(instance, initial, props.loop)
   restoreActiveSkin(instance)
   if (instance.animationState && instance.skeleton) {
