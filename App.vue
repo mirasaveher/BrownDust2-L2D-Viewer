@@ -34,7 +34,7 @@ const activeCatalogMode = ref('animations')
 const availableLayers = ref([])
 const layerVisibility = ref({})
 const sortBy = ref('name-asc')
-const selectedCharacter = ref('003501')
+const selectedCharacter = ref('068001')
 const characterOpened = ref(false)
 const activeSpineSet = ref('character')
 const datingAnimationSets = ref({})
@@ -148,6 +148,11 @@ const filteredCharacters = computed(() => {
     return matchesSearch && matchesFilters
   })
   return filtered.sort((a, b) => {
+    const priority = ['068001', '001297']
+    const priorityDifference = priority.indexOf(a.id) - priority.indexOf(b.id)
+    if (priorityDifference !== 0 && (priority.includes(a.id) || priority.includes(b.id))) {
+      return priority.indexOf(a.id) === -1 ? 1 : priority.indexOf(b.id) === -1 ? -1 : priorityDifference
+    }
     if (sortBy.value === 'name-desc') return b.charName.localeCompare(a.charName)
     if (sortBy.value === 'id-asc') return a.id.localeCompare(b.id, undefined, { numeric: true })
     if (sortBy.value === 'id-desc') return b.id.localeCompare(a.id, undefined, { numeric: true })

@@ -1901,5 +1901,21 @@
     "cutscene": "",
     "dating": "",
     "audio": ""
+  },
+  "001297": {
+    "charName": "Liatris",
+    "costumeName": "Sweet Temptation",
+    "spine": "char001297",
+    "cutscene": "cutscene_char001297",
+    "dating": "",
+    "audio": ""
+  },
+  "068001": {
+    "charName": "Valze",
+    "costumeName": "Night of Betrayal",
+    "spine": "char068001",
+    "cutscene": "cutscene_char068001",
+    "dating": "",
+    "audio": ""
   }
 }
