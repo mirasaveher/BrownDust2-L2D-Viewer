@@ -1908,7 +1908,7 @@
     "spine": "char001297",
     "cutscene": "cutscene_char001297",
     "dating": "",
-    "audio": ""
+    "audio": "Char001297_BattleReady"
   },
   "068001": {
     "charName": "Valze",
@@ -1916,6 +1916,6 @@
     "spine": "char068001",
     "cutscene": "cutscene_char068001",
     "dating": "",
-    "audio": ""
+    "audio": "Char068001_BattleReady"
   }
 }
