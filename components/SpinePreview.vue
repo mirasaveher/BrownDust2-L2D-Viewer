@@ -154,16 +154,24 @@ function playVoiceLine() {
   })
 }
 
+function getVoiceMotionAnimations() {
+  const animations = player?.skeleton?.data?.animations || []
+  const idle = animations.find(a => /^idle/i.test(a.name))
+  const motion = animations.find(a => /^motion/i.test(a.name))
+    || animations.find(a => /^(?:touch|click|tap|interact)/i.test(a.name))
+  return { idle, motion }
+}
+
 function isReadyForMotion() {
   if (!loaded || !player || !props.audioBase || !props.playing) return false
   if (props.datingTracks) return false
-  if ((props.animation || '').toLowerCase() !== 'idle') return false
+  if (!/^idle/i.test(props.animation || '')) return false
 
   const state = player.animationState
   const entry = state?.getCurrent(0)
-  if (!state || !entry || entry.animation?.name?.toLowerCase() !== 'idle' || entry.next) return false
+  if (!state || !entry || !/^idle/i.test(entry.animation?.name || '') || entry.next) return false
 
-  return getAnimationNames(player).some(n => n.toLowerCase() === 'motion')
+  return Boolean(getVoiceMotionAnimations().motion)
 }
 
 function hitTestCharacter(x, y) {
@@ -207,9 +215,7 @@ function onClickUp(e) {
   if (!wasClick || !sameInstance || !isReadyForMotion() || !hitTestCharacter(e.clientX, e.clientY)) return
 
   const state = player.animationState
-  const anims = player.skeleton.data.animations
-  const motion = anims.find(a => a.name.toLowerCase() === 'motion')
-  const idle = anims.find(a => a.name.toLowerCase() === 'idle')
+  const { motion, idle } = getVoiceMotionAnimations()
   if (!motion || !idle) return
 
   state.setAnimation(0, motion.name, false)

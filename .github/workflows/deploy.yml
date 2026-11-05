@@ -1,4 +1,4 @@
-name: Added unknown NPC
+name: Fix new voices
 
 on:
   push:
