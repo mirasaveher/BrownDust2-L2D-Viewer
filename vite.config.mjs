@@ -15,7 +15,7 @@ export default defineConfig(({ command, mode }) => {
     define: {
       'import.meta.env.VITE_ASSET_BASE_URL': JSON.stringify(useExternalAssets ? externalAssetBase : ''),
     },
-    publicDir: useExternalAssets ? 'public' : 'public_final',
+    publicDir: useExternalAssets ? false : 'public_final',
     server: {
       host: '0.0.0.0',
     },

@@ -445,7 +445,7 @@ onBeforeUnmount(() => {
   <div class="app-shell">
     <main class="main-content">
       <header class="topbar">
-        <button class="topbar-brand" type="button" aria-label="Return to start" @click="returnToStart"><img class="topbar-brand-avatar" src="/justia-logo.webp" alt="" /><span class="topbar-brand-copy"><span class="topbar-brand-game">BROWN DUST 2</span><span class="topbar-brand-viewer">L2D VIEWER</span></span></button>
+        <button class="topbar-brand" type="button" aria-label="Return to start" @click="returnToStart"><img class="topbar-brand-avatar" :src="`${assetBaseUrl}justia-logo.webp`" alt="" /><span class="topbar-brand-copy"><span class="topbar-brand-game">BROWN DUST 2</span><span class="topbar-brand-viewer">L2D VIEWER</span></span></button>
         <nav class="top-actions" aria-label="Community">
           <a class="topbar-action topbar-action-telegram" href="https://t.me/browndust_2" target="_blank" rel="noopener noreferrer" data-tooltip="Open Telegram channel" aria-label="Open Brown Dust 2 Telegram channel"><img class="topbar-brand-icon topbar-brand-icon-telegram" src="https://telegram.org/img/t_logo.png" alt="" /></a>
           <a class="topbar-action" href="https://github.com/mirasaveher/BrownDust2-L2D-Viewer" target="_blank" rel="noopener noreferrer" data-tooltip="Open GitHub repository" aria-label="Open GitHub repository"><img class="topbar-brand-icon topbar-brand-icon-github" src="https://cdn.simpleicons.org/github/FFFFFF" alt="" /></a>
