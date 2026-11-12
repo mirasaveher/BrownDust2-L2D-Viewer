@@ -808,12 +808,7 @@ function createPlayer(config, token) {
       if (camera && cameraViewReady) syncCameraToRenderer()
       // Animation timelines can rewrite slot colors every frame. Re-apply
       // hidden layers after the pose is evaluated and before Spine draws it.
-      if (applyHiddenLayers(instance)) {
-        // Spine Player's update callback runs after its normal world-transform
-        // pass. Any skeleton mutation here must be followed by another pass
-        // before the renderer consumes the draw order and clipping attachments.
-        instance.skeleton?.updateWorldTransform()
-      }
+      applyHiddenLayers(instance)
     },
     success: (instance) => {
       handleSuccess(instance, token)
@@ -1006,7 +1001,7 @@ function setLayerVisible(name, visible) {
   else hiddenLayers.add(name)
   if (player) {
     if (visible) restoreVisibleLayerAttachments(player)
-    else if (applyHiddenLayers(player)) player.skeleton?.updateWorldTransform()
+    else applyHiddenLayers(player)
   }
 }
 function setAllLayersVisible(visible, names = []) {
@@ -1022,7 +1017,7 @@ function setAllLayersVisible(visible, names = []) {
   })
   if (player) {
     if (visible) restoreVisibleLayerAttachments(player)
-    else if (applyHiddenLayers(player)) player.skeleton?.updateWorldTransform()
+    else applyHiddenLayers(player)
   }
 }
 async function saveScreenshot(transparent = false) {
