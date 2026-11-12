@@ -290,11 +290,20 @@ function getAnimationNames(instance) {
 function applyHiddenLayers(instance) {
   const slots = instance.skeleton?.slots || []
   slots.forEach((slot) => {
-    if (!slot.data?.name) return
-    if (!hiddenLayers.has(slot.data.name)) return
+    if (!slot.data?.name || !hiddenLayers.has(slot.data.name)) return
     if (slot.color) slot.color.a = 0
-    if (slot.darkColor) slot.darkColor.a = 0
   })
+}
+
+function restoreVisibleLayerColors(instance) {
+  const skeleton = instance?.skeleton
+  if (!skeleton) return
+  skeleton.slots.forEach((slot) => {
+    if (!slot.data?.name || hiddenLayers.has(slot.data.name)) return
+    if (slot.color) slot.color.a = slot.data?.color?.a ?? 1
+  })
+  instance.animationState?.apply(skeleton)
+  applyHiddenLayers(instance)
 }
 
 function applyAnimation(instance, name, loop = true) {
@@ -773,10 +782,13 @@ function createPlayer(config, token) {
       padBottom: 50,
       transitionTime: 0,
     },
-    update: () => {
+    update: (instance) => {
       // Spine Player resets its renderer camera from the viewport every frame.
       // Re-apply our user camera only after that reset, while tracking resizes.
       if (camera && cameraViewReady) syncCameraToRenderer()
+      // Animation timelines can rewrite slot colors every frame. Re-apply
+      // hidden layers after the pose is evaluated and before Spine draws it.
+      applyHiddenLayers(instance)
     },
     success: (instance) => {
       handleSuccess(instance, token)
@@ -967,14 +979,12 @@ function resetView() {
 function setLayerVisible(name, visible) {
   if (visible) hiddenLayers.delete(name)
   else hiddenLayers.add(name)
-  const slot = player?.skeleton?.slots?.find((item) => item.data?.name === name)
-  if (slot && visible) {
-    if (slot.color) slot.color.a = slot.data?.color?.a ?? 1
-    if (slot.darkColor) slot.darkColor.a = slot.data?.darkColor?.a ?? 1
+  if (player) {
+    if (visible) restoreVisibleLayerColors(player)
+    else applyHiddenLayers(player)
+    player.skeleton?.updateWorldTransform()
+    player.drawFrame?.(false)
   }
-  if (player) applyHiddenLayers(player)
-  player?.skeleton?.updateWorldTransform()
-  player?.drawFrame?.(false)
 }
 function setAllLayersVisible(visible, names = []) {
   names.forEach((name) => {
@@ -987,15 +997,12 @@ function setAllLayersVisible(visible, names = []) {
     if (visible) hiddenLayers.delete(name)
     else hiddenLayers.add(name)
   })
-  if (visible) {
-    ;(player?.skeleton?.slots || []).forEach((slot) => {
-      if (slot.color) slot.color.a = slot.data?.color?.a ?? 1
-      if (slot.darkColor) slot.darkColor.a = slot.data?.darkColor?.a ?? 1
-    })
+  if (player) {
+    if (visible) restoreVisibleLayerColors(player)
+    else applyHiddenLayers(player)
+    player.skeleton?.updateWorldTransform()
+    player.drawFrame?.(false)
   }
-  if (player) applyHiddenLayers(player)
-  player?.skeleton?.updateWorldTransform()
-  player?.drawFrame?.(false)
 }
 async function saveScreenshot(transparent = false) {
   const instance = player
