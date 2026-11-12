@@ -90,6 +90,7 @@ let panHandlers = null
 let activePointerId = null
 let lastPointer = null
 const hiddenLayers = new Set()
+const hiddenSlotAttachments = new Map()
 // Voice line rotation + click-to-play motion
 let voiceBank = null
 let currentVoice = null
@@ -254,6 +255,8 @@ function release() {
   cameraYValue = 0
   originalCameraUpdate = null
   activeSkinName = ''
+  hiddenLayers.clear()
+  hiddenSlotAttachments.clear()
   if (wheelHandler) window.removeEventListener('wheel', wheelHandler, true)
   if (wheelAnimationFrame) cancelAnimationFrame(wheelAnimationFrame)
   wheelAnimationFrame = 0
@@ -291,18 +294,28 @@ function applyHiddenLayers(instance) {
   const slots = instance.skeleton?.slots || []
   slots.forEach((slot) => {
     if (!slot.data?.name || !hiddenLayers.has(slot.data.name)) return
-    if (slot.color) slot.color.a = 0
+    const attachment = slot.getAttachment?.()
+    if (attachment) hiddenSlotAttachments.set(slot, attachment)
+    // Detaching is required for clipping attachments: alpha alone hides the
+    // image but leaves the clipping polygon active for every following slot.
+    if (attachment) slot.setAttachment(null)
   })
 }
 
-function restoreVisibleLayerColors(instance) {
+function restoreVisibleLayerAttachments(instance) {
   const skeleton = instance?.skeleton
   if (!skeleton) return
-  skeleton.slots.forEach((slot) => {
-    if (!slot.data?.name || hiddenLayers.has(slot.data.name)) return
-    if (slot.color) slot.color.a = slot.data?.color?.a ?? 1
-  })
+  // Re-evaluate the current animation pose first so animated attachment
+  // timelines restore the attachment belonging to the current frame.
   instance.animationState?.apply(skeleton)
+  skeleton.slots.forEach((slot) => {
+    if (hiddenLayers.has(slot.data?.name)) return
+    if (!slot.getAttachment?.()) {
+      const savedAttachment = hiddenSlotAttachments.get(slot)
+      if (savedAttachment) slot.setAttachment(savedAttachment)
+    }
+    hiddenSlotAttachments.delete(slot)
+  })
   applyHiddenLayers(instance)
 }
 
@@ -980,10 +993,8 @@ function setLayerVisible(name, visible) {
   if (visible) hiddenLayers.delete(name)
   else hiddenLayers.add(name)
   if (player) {
-    if (visible) restoreVisibleLayerColors(player)
+    if (visible) restoreVisibleLayerAttachments(player)
     else applyHiddenLayers(player)
-    player.skeleton?.updateWorldTransform()
-    player.drawFrame?.(false)
   }
 }
 function setAllLayersVisible(visible, names = []) {
@@ -998,10 +1009,8 @@ function setAllLayersVisible(visible, names = []) {
     else hiddenLayers.add(name)
   })
   if (player) {
-    if (visible) restoreVisibleLayerColors(player)
+    if (visible) restoreVisibleLayerAttachments(player)
     else applyHiddenLayers(player)
-    player.skeleton?.updateWorldTransform()
-    player.drawFrame?.(false)
   }
 }
 async function saveScreenshot(transparent = false) {

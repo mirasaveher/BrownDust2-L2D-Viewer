@@ -325,10 +325,10 @@ function onSkins(names, initialSkin = '') {
   selectedSkin.value = selectableSkins.includes(initialSkin) ? initialSkin : selectableSkins[0] || initialSkin || ''
 }
 function onLayers(names) {
-  availableLayers.value = [...new Set([...availableLayers.value, ...names])].sort((a, b) => a.localeCompare(b))
-  const next = { ...layerVisibility.value }
-  availableLayers.value.forEach((name) => { if (!(name in next)) next[name] = true })
-  layerVisibility.value = next
+  // A new Spine asset replaces the previous layer catalogue; never merge
+  // names from the previous costume / Ultimate / Fated Guest model.
+  availableLayers.value = [...new Set((names || []).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+  layerVisibility.value = Object.fromEntries(availableLayers.value.map((name) => [name, true]))
 }
 function toggleLayer(name) {
   const visible = layerVisibility.value[name] === false
