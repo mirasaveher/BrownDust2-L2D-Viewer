@@ -292,14 +292,18 @@ function getAnimationNames(instance) {
 
 function applyHiddenLayers(instance) {
   const slots = instance.skeleton?.slots || []
+  let changed = false
   slots.forEach((slot) => {
     if (!slot.data?.name || !hiddenLayers.has(slot.data.name)) return
     const attachment = slot.getAttachment?.()
-    if (attachment) hiddenSlotAttachments.set(slot, attachment)
+    if (!attachment) return
+    hiddenSlotAttachments.set(slot, attachment)
     // Detaching is required for clipping attachments: alpha alone hides the
     // image but leaves the clipping polygon active for every following slot.
-    if (attachment) slot.setAttachment(null)
+    slot.setAttachment(null)
+    changed = true
   })
+  return changed
 }
 
 function restoreVisibleLayerAttachments(instance) {
@@ -317,6 +321,9 @@ function restoreVisibleLayerAttachments(instance) {
     hiddenSlotAttachments.delete(slot)
   })
   applyHiddenLayers(instance)
+  // The animation pose and attachments were changed after the player's
+  // normal world-transform pass. Recompute transforms before the next draw.
+  skeleton.updateWorldTransform()
 }
 
 function applyAnimation(instance, name, loop = true) {
@@ -801,7 +808,12 @@ function createPlayer(config, token) {
       if (camera && cameraViewReady) syncCameraToRenderer()
       // Animation timelines can rewrite slot colors every frame. Re-apply
       // hidden layers after the pose is evaluated and before Spine draws it.
-      applyHiddenLayers(instance)
+      if (applyHiddenLayers(instance)) {
+        // Spine Player's update callback runs after its normal world-transform
+        // pass. Any skeleton mutation here must be followed by another pass
+        // before the renderer consumes the draw order and clipping attachments.
+        instance.skeleton?.updateWorldTransform()
+      }
     },
     success: (instance) => {
       handleSuccess(instance, token)
@@ -994,7 +1006,7 @@ function setLayerVisible(name, visible) {
   else hiddenLayers.add(name)
   if (player) {
     if (visible) restoreVisibleLayerAttachments(player)
-    else applyHiddenLayers(player)
+    else if (applyHiddenLayers(player)) player.skeleton?.updateWorldTransform()
   }
 }
 function setAllLayersVisible(visible, names = []) {
@@ -1010,7 +1022,7 @@ function setAllLayersVisible(visible, names = []) {
   })
   if (player) {
     if (visible) restoreVisibleLayerAttachments(player)
-    else applyHiddenLayers(player)
+    else if (applyHiddenLayers(player)) player.skeleton?.updateWorldTransform()
   }
 }
 async function saveScreenshot(transparent = false) {
