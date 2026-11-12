@@ -1,4 +1,4 @@
-name: Layers bug fix
+name: Fix view layer
 
 on:
   push:
