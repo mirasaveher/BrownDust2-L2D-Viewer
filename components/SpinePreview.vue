@@ -888,10 +888,7 @@ watch(() => props.animation, (name) => {
     player.skeleton.updateWorldTransform()
   }
   applyHiddenLayers(player)
-  // Ultimate/cutscene animations can have a very different opening pose and
-  // framing from the animation used when the asset was first loaded.
-  // Recalculate the initial camera bounds for each selected animation.
-  fitCameraToSkeleton(player)
+  player.drawFrame?.(false)
   player.drawFrame?.(false)
   if (props.playing) player.play()
 })
@@ -908,7 +905,6 @@ function applySelectedSkin(instance, skinName) {
   instance.animationState?.apply(skeleton)
   applyHiddenLayers(instance)
   skeleton.updateWorldTransform()
-  fitCameraToSkeleton(instance)
   instance.drawFrame?.(false)
 }
 
