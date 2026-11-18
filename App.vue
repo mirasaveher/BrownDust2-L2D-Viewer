@@ -72,11 +72,8 @@ function couponResultKey(nickname, code) { return `${nickname.trim().toLocaleLow
 function couponStatus(code) { return couponResultStore.value[couponResultKey(couponNickname.value, code)]?.status || '' }
 function couponStatusDetail(code) { return couponResultStore.value[couponResultKey(couponNickname.value, code)]?.detail || '' }
 function couponStatusLabel(code) {
-  const labels = { success: 'Claimed', already: 'Already claimed', expired: 'Expired', invalid: 'Invalid code', nickname: 'Nickname not found', limit: 'Usage limit reached', network: 'Connection error', error: 'Request failed', claiming: 'Claiming...' }
-  const status = couponStatus(code)
-  const label = t(labels[status] || 'Not claimed')
-  const detail = couponStatusDetail(code)
-  return detail ? `${label}: ${detail}` : label
+  const labels = { success: 'Claimed', already: 'Already claimed', expired: 'Expired', invalid: 'Invalid code', nickname: 'Nickname not found', limit: 'Usage limit reached', network: 'Connection error', error: 'Connection error', claiming: 'Claiming...' }
+  return t(labels[couponStatus(code)] || 'Not claimed')
 }
 function saveCouponNickname() {
   try { window.localStorage.setItem(couponNicknameStorageKey, couponNickname.value.trim()) } catch {  }

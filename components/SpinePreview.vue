@@ -1063,6 +1063,52 @@ function setAllLayersVisible(visible, names = []) {
   player?.skeleton?.updateWorldTransform()
   player?.drawFrame?.(false)
 }
+function prepareScreenshotRenderSize(instance, canvas, renderer, targetSize, dpr) {
+  const previousWidth = canvas.width
+  const previousHeight = canvas.height
+  const elements = [host, instance.dom, canvas].filter(Boolean)
+  const previousStyles = elements.map(element => element.getAttribute('style'))
+  const cssSize = `${targetSize / dpr}px`
+  const setSize = element => {
+    element.style.setProperty('width', cssSize, 'important')
+    element.style.setProperty('height', cssSize, 'important')
+    element.style.setProperty('min-width', cssSize, 'important')
+    element.style.setProperty('min-height', cssSize, 'important')
+    element.style.setProperty('max-width', cssSize, 'important')
+    element.style.setProperty('max-height', cssSize, 'important')
+  }
+  const restore = () => {
+    elements.forEach((element, index) => {
+      const style = previousStyles[index]
+      if (style === null) element.removeAttribute('style')
+      else element.setAttribute('style', style)
+    })
+    canvas.width = previousWidth
+    canvas.height = previousHeight
+    renderer.resize(previousWidth, previousHeight)
+  }
+  try {
+    if (host) {
+      host.style.setProperty('position', 'fixed', 'important')
+      host.style.setProperty('left', '-10000px', 'important')
+      host.style.setProperty('top', '0', 'important')
+      host.style.setProperty('overflow', 'hidden', 'important')
+      host.style.setProperty('visibility', 'hidden', 'important')
+      host.style.setProperty('pointer-events', 'none', 'important')
+      setSize(host)
+    }
+    if (instance.dom) setSize(instance.dom)
+    setSize(canvas)
+    void host?.getBoundingClientRect()
+    canvas.width = targetSize
+    canvas.height = targetSize
+    renderer.resize(targetSize, targetSize)
+    return restore
+  } catch (error) {
+    restore()
+    throw error
+  }
+}
 async function saveScreenshot(transparent = false) {
   const instance = player
   const canvas = instance?.canvas
@@ -1078,10 +1124,6 @@ async function saveScreenshot(transparent = false) {
   const prevZoom = cam.zoom
   const prevWidth = canvas.width
   const prevHeight = canvas.height
-  const prevStyleWidth = canvas.style.getPropertyValue('width')
-  const prevStyleHeight = canvas.style.getPropertyValue('height')
-  const prevStyleWidthPriority = canvas.style.getPropertyPriority('width')
-  const prevStyleHeightPriority = canvas.style.getPropertyPriority('height')
   const dpr = window.devicePixelRatio || 1
 
   const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 0
@@ -1113,6 +1155,7 @@ async function saveScreenshot(transparent = false) {
   const filename = `BD2_Studio_${characterId}_${animationName}.png`
 
   let screenshotBlobPromise
+  let restoreRenderSize = () => {}
 
   try {
     if (!props.useCurrentCamera && defaultCameraPosition) {
@@ -1123,14 +1166,10 @@ async function saveScreenshot(transparent = false) {
     cam.update()
     setTransparentBackground(transparent)
 
-    canvas.style.setProperty('width', `${targetSize / dpr}px`, 'important')
-    canvas.style.setProperty('height', `${targetSize / dpr}px`, 'important')
-    canvas.width = targetSize
-    canvas.height = targetSize
-    renderer.resize(targetSize, targetSize)
+    restoreRenderSize = prepareScreenshotRenderSize(instance, canvas, renderer, targetSize, dpr)
 
     if (canvas.width !== targetSize || canvas.height !== targetSize) {
-      throw new Error(`High-resolution render was reduced to ${canvas.width}×${canvas.height}; the image was not exported.`)
+      throw new Error(`The renderer could not reach the requested screenshot size (${canvas.width}×${canvas.height}).`)
     }
 
     const renderCamera = renderer.camera
@@ -1182,19 +1221,12 @@ async function saveScreenshot(transparent = false) {
       screenshotCanvas.toBlob(value => value ? resolve(value) : reject(new Error('Could not encode the PNG screenshot.')), 'image/png')
     })
   } finally {
-    canvas.width = prevWidth
-    canvas.height = prevHeight
-    if (prevStyleWidth) canvas.style.setProperty('width', prevStyleWidth, prevStyleWidthPriority)
-    else canvas.style.removeProperty('width')
-    if (prevStyleHeight) canvas.style.setProperty('height', prevStyleHeight, prevStyleHeightPriority)
-    else canvas.style.removeProperty('height')
-    renderer.resize(prevWidth, prevHeight)
-
     cam.position.x = prevPosX
     cam.position.y = prevPosY
     cam.zoom = prevZoom
     cam.update()
     setTransparentBackground(false)
+    restoreRenderSize()
     const renderCamera = renderer.camera
     if (renderCamera) {
       renderCamera.position.x = cam.position.x
@@ -1206,11 +1238,6 @@ async function saveScreenshot(transparent = false) {
   }
 
   const blob = await screenshotBlobPromise
-  const file = new File([blob], filename, { type: 'image/png' })
-  if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-    await navigator.share({ files: [file], title: filename })
-    return
-  }
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
