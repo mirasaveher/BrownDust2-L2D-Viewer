@@ -227,6 +227,7 @@ const isScreenshotting = ref(false)
 const isFullscreen = ref(false)
 const fullscreenControlsHidden = ref(false)
 const fullscreenFallback = ref(false)
+let previousBodyOverflow = ''
 const transparentScreenshot = ref(false)
 const useCurrentCameraForExport = ref(false)
 const isExportingAnimation = ref(false)
@@ -449,7 +450,8 @@ function selectSpineSet(set) {
   importError.value = ''
 }
 function onFiles(event) {
-  const files = Array.from(event.target.files || [])
+  const files = Array.from(event.target?.files || event.dataTransfer?.files || [])
+  if (event.target?.value) event.target.value = ''
   const atlas = files.find((file) => file.name.toLowerCase().endsWith('.atlas'))
   const skeleton = files.find((file) => /\.(skel|json)$/i.test(file.name))
   const textures = files.filter((file) => /\.(png|webp)$/i.test(file.name))
@@ -534,6 +536,7 @@ async function takeScreenshot() {
     await spinePreviewRef.value.saveScreenshot(transparentScreenshot.value)
   } catch (error) {
     console.error('Failed to save screenshot:', error)
+    window.alert(error?.message || 'Could not save screenshot.')
   } finally {
     isScreenshotting.value = false
   }
@@ -563,34 +566,39 @@ function cycleSpeed() {
   playbackSpeed.value = speeds[(speeds.indexOf(playbackSpeed.value) + 1) % speeds.length]
 }
 function activateFullscreenFallback() {
+  if (!fullscreenFallback.value) previousBodyOverflow = document.body.style.overflow
   fullscreenFallback.value = true
   isFullscreen.value = true
-  document.addEventListener('pointerdown', scheduleFullscreenControlsHide, { passive: true })
-  document.addEventListener('pointermove', scheduleFullscreenControlsHide, { passive: true })
-  scheduleFullscreenControlsHide()
+  fullscreenControlsHidden.value = false
+  document.body.style.overflow = 'hidden'
+  document.documentElement.classList.add('mobile-viewer-fullscreen')
+  clearFullscreenHideTimer()
+}
+function exitMobileFullscreen() {
+  if (!fullscreenFallback.value) return
+  fullscreenFallback.value = false
+  isFullscreen.value = false
+  fullscreenControlsHidden.value = false
+  clearFullscreenHideTimer()
+  document.body.style.overflow = previousBodyOverflow
+  document.documentElement.classList.remove('mobile-viewer-fullscreen')
 }
 function toggleFullscreen() {
-  if (isFullscreen.value) {
-    if (document.fullscreenElement) document.exitFullscreen?.()
-    else {
-      fullscreenFallback.value = false
-      isFullscreen.value = false
-      fullscreenControlsHidden.value = false
-      clearFullscreenHideTimer()
-      document.removeEventListener('pointerdown', scheduleFullscreenControlsHide)
-      document.removeEventListener('pointermove', scheduleFullscreenControlsHide)
-    }
+  if (fullscreenFallback.value) {
+    exitMobileFullscreen()
     return
   }
-  const element = stageRef.value
-  if (!element) return
-  if (typeof element.requestFullscreen !== 'function') {
+  if (isFullscreen.value && document.fullscreenElement) {
+    document.exitFullscreen?.()
+    return
+  }
+  if (window.matchMedia('(max-width: 820px)').matches || !stageRef.value?.requestFullscreen) {
     activateFullscreenFallback()
     return
   }
   try {
-    const request = element.requestFullscreen()
-    request?.catch?.(activateFullscreenFallback)
+    const request = stageRef.value.requestFullscreen()
+    request?.catch?.(() => activateFullscreenFallback())
   } catch {
     activateFullscreenFallback()
   }
@@ -624,15 +632,7 @@ function syncFullscreenState() {
   }
 }
 function handleGlobalKeydown(event) {
-  if (event.key === 'Escape' && fullscreenFallback.value) {
-    fullscreenFallback.value = false
-    isFullscreen.value = false
-    fullscreenControlsHidden.value = false
-    clearFullscreenHideTimer()
-    document.removeEventListener('pointerdown', scheduleFullscreenControlsHide)
-    document.removeEventListener('pointermove', scheduleFullscreenControlsHide)
-    return
-  }
+  if (event.key === 'Escape' && fullscreenFallback.value) return
   if (event.key === 'Escape' && languageMenuOpen.value) { languageMenuOpen.value = false; return }
   if (event.key === 'Escape' && languageMenuOpen.value) { languageMenuOpen.value = false; return }
   if (event.code !== 'Space' || activeTab.value !== 'viewer' || showImport.value) return
@@ -669,6 +669,10 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', scheduleFullscreenControlsHide)
   document.removeEventListener('pointermove', scheduleFullscreenControlsHide)
   clearFullscreenHideTimer()
+  if (fullscreenFallback.value) {
+    document.body.style.overflow = previousBodyOverflow
+    document.documentElement.classList.remove('mobile-viewer-fullscreen')
+  }
 })
 </script>
 
@@ -769,7 +773,7 @@ onBeforeUnmount(() => {
             </div>
           </aside>
           <section ref="stageRef" class="stage-panel" :class="{ 'controls-hidden': isFullscreen && fullscreenControlsHidden, 'mobile-fullscreen': fullscreenFallback }">
-            <div class="panel-topline"><div class="panel-label"><span class="live-indicator"></span><span class="panel-costume-title">{{ activeCostumeTitle }}</span><span class="muted-tag" :class="activeSpineSet === 'character' ? 'tag-standard' : activeSpineSet === 'ultimate' ? 'tag-ultimate' : activeSpineSet === 'dating' ? 'tag-fg' : activeSpineSet === 'accessories' ? 'tag-accessory' : 'tag-standard'" :style="activeSpineSet === 'illustration' ? { color: '#f3d18a', borderColor: '#9d7b3f', background: '#3a2e19' } : null">{{ activeSpineSet === 'character' ? t('Standard').toUpperCase() : activeSpineSet === 'ultimate' ? t('Ultimate').toUpperCase() : activeSpineSet === 'dating' ? t('Fated Guest').toUpperCase() : activeSpineSet === 'accessories' ? t('Accessories').toUpperCase() : t('Special Illustrations').toUpperCase() }}</span></div><div class="stage-actions"><span class="zoom-readout desktop-zoom-readout">{{ previewScale }}%</span><button class="icon-button desktop-zoom-button" :data-tooltip="t('Reset position and zoom')" :aria-label="t('Reset position and zoom')" @click="spinePreviewRef?.resetView?.()"><RotateCcw :size="15" /></button><button class="icon-button desktop-zoom-button" :aria-label="t('Zoom out')" @click="spinePreviewRef?.zoomOut?.()"><Minus :size="15" /></button><button class="icon-button desktop-zoom-button" :aria-label="t('Zoom in')" @click="spinePreviewRef?.zoomIn?.()"><Plus :size="15" /></button><button class="icon-button mobile-camera-reset" :aria-label="t('Reset position and zoom')" @click="spinePreviewRef?.resetView?.()"><RotateCcw :size="15" /></button></div></div>
+            <div class="panel-topline"><div class="panel-label"><span class="live-indicator"></span><span class="panel-costume-title">{{ activeCostumeTitle }}</span><span class="muted-tag" :class="activeSpineSet === 'character' ? 'tag-standard' : activeSpineSet === 'ultimate' ? 'tag-ultimate' : activeSpineSet === 'dating' ? 'tag-fg' : activeSpineSet === 'accessories' ? 'tag-accessory' : 'tag-standard'" :style="activeSpineSet === 'illustration' ? { color: '#f3d18a', borderColor: '#9d7b3f', background: '#3a2e19' } : null">{{ activeSpineSet === 'character' ? t('Standard').toUpperCase() : activeSpineSet === 'ultimate' ? t('Ultimate').toUpperCase() : activeSpineSet === 'dating' ? t('Fated Guest').toUpperCase() : activeSpineSet === 'accessories' ? t('Accessories').toUpperCase() : t('Special Illustrations').toUpperCase() }}</span></div><div class="stage-actions"><span class="zoom-readout desktop-zoom-readout">{{ previewScale }}%</span><button class="icon-button desktop-zoom-button" :data-tooltip="t('Reset position and zoom')" :aria-label="t('Reset position and zoom')" @click="spinePreviewRef?.resetView?.()"><RotateCcw :size="15" /></button><button class="icon-button desktop-zoom-button" :aria-label="t('Zoom out')" @click="spinePreviewRef?.zoomOut?.()"><Minus :size="15" /></button><button class="icon-button desktop-zoom-button" :aria-label="t('Zoom in')" @click="spinePreviewRef?.zoomIn?.()"><Plus :size="15" /></button><button class="icon-button mobile-camera-reset" :aria-label="t('Reset position and zoom')" @click="spinePreviewRef?.resetView?.()"><RotateCcw :size="15" /></button><button v-if="fullscreenFallback" type="button" class="icon-button mobile-fullscreen-exit" :aria-label="t('Exit Full Screen')" :title="t('Exit Full Screen')" @click="exitMobileFullscreen"><X :size="20" /></button></div></div>
             <div class="stage stage-large" :class="selectedCharacterName.toLowerCase()" >
               <div class="stage-grid"></div><div class="orb orb-one"></div><div class="orb orb-two"></div>
               <div class="stage-watermark"><Sparkles :size="15" /> BROWNDUST2 L2D VIEWER</div>
@@ -860,7 +864,7 @@ onBeforeUnmount(() => {
     </div>
     <div v-if="showImport" class="modal-backdrop" @click.self="showImport = false">
       <div class="import-modal"><div class="modal-heading"><div><div class="eyebrow">{{ t('ASSET MANAGER') }}</div><h2>{{ t('Import character files') }}</h2></div><button class="icon-button" @click="showImport = false"><X :size="18" /></button></div>
-        <label class="drop-zone"><input type="file" multiple accept=".skel,.json,.atlas,.png,.webp" @change="onFiles" /><span class="upload-icon"><CloudUpload :size="23" /></span><strong>{{ t('Choose files to import') }}</strong><small>{{ t('Drop files here or browse your device') }}</small><em>{{ t('Select the .atlas, .skel/.json file and all associated .png/.webp textures.') }}</em></label>
+        <label class="drop-zone" @dragover.prevent @drop.prevent="onFiles"><input type="file" multiple accept=".skel,.json,.atlas,.png,.webp" @change="onFiles" /><span class="upload-icon"><CloudUpload :size="23" /></span><strong>{{ t('Choose files to import') }}</strong><small>{{ t('Drop files here or browse your device') }}</small><em>{{ t('Select the .atlas, .skel/.json file and all associated .png/.webp textures.') }}</em></label>
         <p v-if="importError" class="import-error">{{ importError }}</p>
         <div class="modal-footer"><span>{{ spineFiles.length ? t('Files are ready to preview') : t('Select a complete set of Spine files') }}</span><button class="button-primary" @click="showImport = false">{{ t('Done') }} <ChevronRight :size="15" /></button></div>
       </div>

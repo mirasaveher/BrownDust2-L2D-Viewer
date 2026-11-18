@@ -1088,10 +1088,11 @@ async function saveScreenshot(transparent = false) {
   const maxRenderbufferSize = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || maxTextureSize
   const maxViewportDims = gl.getParameter(gl.MAX_VIEWPORT_DIMS) || [maxRenderbufferSize, maxRenderbufferSize]
   const maxSupportedSize = Math.min(maxTextureSize, maxRenderbufferSize, maxViewportDims[0], maxViewportDims[1])
-  if (maxSupportedSize < 3000) {
-    throw new Error(`This device supports only ${maxSupportedSize}px screenshots; 3000×3000 export is unavailable.`)
+  if (!maxSupportedSize || maxSupportedSize < 512) {
+    throw new Error(`This device does not support a usable screenshot size (maximum: ${maxSupportedSize}px).`)
   }
-  const targetSize = 3000
+  const isMobileDevice = window.matchMedia('(max-width: 820px)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  const targetSize = Math.min(3000, maxSupportedSize, isMobileDevice ? 2048 : 3000)
   const scaleW = targetSize / prevWidth
   const scaleH = targetSize / prevHeight
   const scale = Math.max(scaleW, scaleH) || 1
@@ -1205,10 +1206,16 @@ async function saveScreenshot(transparent = false) {
   }
 
   const blob = await screenshotBlobPromise
+  const file = new File([blob], filename, { type: 'image/png' })
+  if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+    await navigator.share({ files: [file], title: filename })
+    return
+  }
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
   link.download = filename
+  link.style.display = 'none'
   document.body.appendChild(link)
   link.click()
   link.remove()
