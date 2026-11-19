@@ -2,6 +2,7 @@
 import { inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { SpinePlayer, Vector2, OrthoCamera } from '@esotericsoftware/spine-player'
 import '@esotericsoftware/spine-player/dist/spine-player.css'
+import '@esotericsoftware/spine-player-4-2/dist/spine-player.css'
 import { Output, WebMOutputFormat, BufferTarget, CanvasSource, Quality, canEncodeVideo } from 'mediabunny'
 import JSZip from 'jszip'
 import { GIFEncoder, quantize } from 'gifenc'
@@ -65,10 +66,13 @@ const props = defineProps({
   speed: { type: Number, default: 1 },
   useCurrentCamera: { type: Boolean, default: false },
   audioBase: { type: String, default: '' },
+  runtimeVersion: { type: String, default: '4.1' },
 })
 const emit = defineEmits(['animations', 'skins', 'layers', 'error', 'ready', 'progress', 'duration', 'zoom'])
 
 let player = null
+let spineRuntime = { SpinePlayer, Vector2, OrthoCamera }
+let loadedRuntimeVersion = '4.1'
 let objectUrls = []
 const hostEl = ref(null)
 let host = null
@@ -190,8 +194,8 @@ function hitTestCharacter(x, y) {
   const worldX = (nx * 2 - 1) * (cam.viewportWidth / 2) * cam.zoom + cam.position.x
   const worldY = (1 - ny * 2) * (cam.viewportHeight / 2) * cam.zoom + cam.position.y
 
-  const offset = new Vector2()
-  const size = new Vector2()
+  const offset = new spineRuntime.Vector2()
+  const size = new spineRuntime.Vector2()
   skel.getBounds(offset, size)
   return size.x > 0 && size.y > 0
     && worldX >= offset.x && worldX <= offset.x + size.x
@@ -454,8 +458,8 @@ function computeTrimmedBounds(skeleton) {
 
   if (!found || maxX <= minX || maxY <= minY) return null
   return {
-    offset: new Vector2(minX, minY),
-    size: new Vector2(maxX - minX, maxY - minY),
+    offset: new spineRuntime.Vector2(minX, minY),
+    size: new spineRuntime.Vector2(maxX - minX, maxY - minY),
   }
 }
 
@@ -496,8 +500,8 @@ function fitCameraToSkeleton(instance) {
 
   skeleton.updateWorldTransform()
   const trimmed = computeTrimmedBounds(skeleton)
-  const offset = new Vector2()
-  const size = new Vector2()
+  const offset = new spineRuntime.Vector2()
+  const size = new spineRuntime.Vector2()
   let bounds = trimmed
   if (!bounds) {
     skeleton.getBounds(offset, size)
@@ -518,7 +522,7 @@ function fitCameraToSkeleton(instance) {
   const dpr = window.devicePixelRatio || 1
   const viewportWidth = Math.max(1, Math.round((canvas.clientWidth || canvas.width / dpr) * dpr))
   const viewportHeight = Math.max(1, Math.round((canvas.clientHeight || canvas.height / dpr) * dpr))
-  if (!camera) camera = new OrthoCamera(viewportWidth, viewportHeight)
+  if (!camera) camera = new spineRuntime.OrthoCamera(viewportWidth, viewportHeight)
   else camera.setViewport(viewportWidth, viewportHeight)
 
   const paddingX = Math.max(bounds.size.x * 0.06, 1)
@@ -564,8 +568,8 @@ function initializeCamera(instance) {
     skeleton.setSlotsToSetupPose()
     skeleton.updateWorldTransform()
     const visibleBounds = computeTrimmedBounds(skeleton)
-    const testOffset = new Vector2()
-    const testSize = new Vector2()
+    const testOffset = new spineRuntime.Vector2()
+    const testSize = new spineRuntime.Vector2()
     skeleton.getBounds(testOffset, testSize)
     if (visibleBounds || (Number.isFinite(testSize.x) && Number.isFinite(testSize.y)
       && testSize.x > 0 && testSize.y > 0 && testSize.x < 50000 && testSize.y < 50000)) {
@@ -589,8 +593,8 @@ function initializeCamera(instance) {
           chosenSkin = name
         }
       } else {
-        const testOffset = new Vector2()
-        const testSize = new Vector2()
+        const testOffset = new spineRuntime.Vector2()
+        const testSize = new spineRuntime.Vector2()
         skeleton.getBounds(testOffset, testSize)
         const area = testSize.x * testSize.y
         if (Number.isFinite(area) && testSize.x > 0 && testSize.y > 0
@@ -608,7 +612,7 @@ function initializeCamera(instance) {
     }
   }
 
-  camera = new OrthoCamera(renderCamera.viewportWidth || canvas.width, renderCamera.viewportHeight || canvas.height)
+  camera = new spineRuntime.OrthoCamera(renderCamera.viewportWidth || canvas.width, renderCamera.viewportHeight || canvas.height)
   cameraViewReady = false
   wheelCanvas = canvas
   panHandlers = {
@@ -827,7 +831,7 @@ function handleError(token, reason) {
 }
 
 function createPlayer(config, token) {
-  player = new SpinePlayer(host, {
+  player = new spineRuntime.SpinePlayer(host, {
     showControls: false,
     showLoading: true,
     backgroundColor: '00000000',
@@ -864,6 +868,25 @@ async function load() {
   if (!host || (!props.files?.length && !props.assetBase)) return
   const token = ++loadToken
   release()
+
+  try {
+    if (props.runtimeVersion === '4.2' && loadedRuntimeVersion !== '4.2') {
+      const runtime = await import('@esotericsoftware/spine-player-4-2')
+      if (token !== loadToken) return
+      spineRuntime = {
+        SpinePlayer: runtime.SpinePlayer,
+        Vector2: runtime.Vector2,
+        OrthoCamera: runtime.OrthoCamera,
+      }
+      loadedRuntimeVersion = '4.2'
+    } else if (props.runtimeVersion !== '4.2' && loadedRuntimeVersion !== '4.1') {
+      spineRuntime = { SpinePlayer, Vector2, OrthoCamera }
+      loadedRuntimeVersion = '4.1'
+    }
+  } catch (error) {
+    handleError(token, error)
+    return
+  }
 
   if (!props.files?.length && props.assetBase) {
     const base = props.assetBase.replace(/\/$/, '')

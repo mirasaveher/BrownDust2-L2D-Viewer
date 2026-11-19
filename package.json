@@ -14,7 +14,8 @@
     "@esotericsoftware/spine-player": "4.1.55",
     "jszip": "^3.10.1",
     "mediabunny": "^1.56.1",
-    "gifenc": "^1.0.3"
+    "gifenc": "^1.0.3",
+    "@esotericsoftware/spine-player-4-2": "npm:@esotericsoftware/spine-player@4.2.120"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
