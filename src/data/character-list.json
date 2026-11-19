@@ -375,6 +375,14 @@
     "dating": "",
     "audio": ""
   },
+  "067203": {
+    "charName": "Venaka",
+    "costumeName": "Cheers to Victory",
+    "spine": "char067203",
+    "cutscene": "cutscene_char067203",
+    "dating": "",
+    "audio": "Char067203_BattleReady"
+  },
   "101101_c": {
     "charName": "Seir",
     "costumeName": "Demon's Daughter (Censored)",
