@@ -1,11 +1,16 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { SpinePlayer, Vector2, OrthoCamera } from '@esotericsoftware/spine-player'
 import '@esotericsoftware/spine-player/dist/spine-player.css'
 import { Output, WebMOutputFormat, BufferTarget, CanvasSource, Quality, canEncodeVideo } from 'mediabunny'
 import JSZip from 'jszip'
 import { GIFEncoder, quantize } from 'gifenc'
 
+const locale = inject('appLocale', ref('en'))
+const uiRu = {
+  'COLOR':'ЦВЕТ','UPLOAD IMAGE':'ЗАГРУЗИТЬ ИЗОБРАЖЕНИЕ','DONE':'ГОТОВО','EDIT IMAGE':'РЕДАКТИРОВАТЬ ИЗОБРАЖЕНИЕ','REMOVE IMAGE':'УДАЛИТЬ ИЗОБРАЖЕНИЕ','BACKGROUND COLOR':'ЦВЕТ ФОНА','DRAG IMAGE TO MOVE · DRAG CORNER HANDLES TO STRETCH · SCROLL TO ZOOM':'ПЕРЕТАЩИТЕ ИЗОБРАЖЕНИЕ ДЛЯ ПЕРЕМЕЩЕНИЯ · ПОТЯНИТЕ ЗА УГЛЫ ДЛЯ ИЗМЕНЕНИЯ РАЗМЕРА · ПРОКРУТИТЕ КОЛЁСИКО ДЛЯ МАСШТАБА','RESET DEFAULT COLOR':'СБРОСИТЬ ЦВЕТ ПО УМОЛЧАНИЮ','Saturation and brightness picker':'Выбор насыщенности и яркости','Hue':'Оттенок','Resize background image from':'Изменить размер фонового изображения за угол'
+}
+const t = (key) => locale.value === 'ru' ? (uiRu[key] || key) : key
 
 function createGifPalette(sampleFrames, transparent) {
   const size=sampleFrames.reduce((sum,frame)=>sum+frame.length,0),samples=new Uint8Array(size)
@@ -61,7 +66,7 @@ const props = defineProps({
   useCurrentCamera: { type: Boolean, default: false },
   audioBase: { type: String, default: '' },
 })
-const emit = defineEmits(['animations', 'skins', 'layers', 'error', 'ready', 'progress', 'zoom'])
+const emit = defineEmits(['animations', 'skins', 'layers', 'error', 'ready', 'progress', 'duration', 'zoom'])
 
 let player = null
 let objectUrls = []
@@ -89,9 +94,9 @@ let wheelLastFrameTime = 0
 let panHandlers = null
 let activePointerId = null
 let lastPointer = null
+let touchPointers = new Map()
+let pinchState = null
 const hiddenLayers = new Set()
-const hiddenSlotAttachments = new Map()
-// Voice line rotation + click-to-play motion
 let voiceBank = null
 let currentVoice = null
 let clickTracker = null
@@ -157,8 +162,6 @@ function playVoiceLine() {
 
 function getVoiceMotionAnimations() {
   const animations = player?.skeleton?.data?.animations || []
-  // Use the exact base animations, as existing voice-enabled costumes do.
-  // idle1/idle2/etc. are separate pose animations, not the voice interaction idle.
   const idle = animations.find(a => a.name.toLowerCase() === 'idle')
   const motion = animations.find(a => a.name.toLowerCase() === 'motion')
   return { idle, motion }
@@ -255,8 +258,6 @@ function release() {
   cameraYValue = 0
   originalCameraUpdate = null
   activeSkinName = ''
-  hiddenLayers.clear()
-  hiddenSlotAttachments.clear()
   if (wheelHandler) window.removeEventListener('wheel', wheelHandler, true)
   if (wheelAnimationFrame) cancelAnimationFrame(wheelAnimationFrame)
   wheelAnimationFrame = 0
@@ -273,6 +274,8 @@ function release() {
   panHandlers = null
   activePointerId = null
   lastPointer = null
+  touchPointers.clear()
+  pinchState = null
   camera = null
   defaultCameraPosition = null
   if (player) {
@@ -292,38 +295,12 @@ function getAnimationNames(instance) {
 
 function applyHiddenLayers(instance) {
   const slots = instance.skeleton?.slots || []
-  let changed = false
   slots.forEach((slot) => {
-    if (!slot.data?.name || !hiddenLayers.has(slot.data.name)) return
-    const attachment = slot.getAttachment?.()
-    if (!attachment) return
-    hiddenSlotAttachments.set(slot, attachment)
-    // Detaching is required for clipping attachments: alpha alone hides the
-    // image but leaves the clipping polygon active for every following slot.
-    slot.setAttachment(null)
-    changed = true
+    if (!slot.data?.name) return
+    if (!hiddenLayers.has(slot.data.name)) return
+    if (slot.color) slot.color.a = 0
+    if (slot.darkColor) slot.darkColor.a = 0
   })
-  return changed
-}
-
-function restoreVisibleLayerAttachments(instance) {
-  const skeleton = instance?.skeleton
-  if (!skeleton) return
-  // Re-evaluate the current animation pose first so animated attachment
-  // timelines restore the attachment belonging to the current frame.
-  instance.animationState?.apply(skeleton)
-  skeleton.slots.forEach((slot) => {
-    if (hiddenLayers.has(slot.data?.name)) return
-    if (!slot.getAttachment?.()) {
-      const savedAttachment = hiddenSlotAttachments.get(slot)
-      if (savedAttachment) slot.setAttachment(savedAttachment)
-    }
-    hiddenSlotAttachments.delete(slot)
-  })
-  applyHiddenLayers(instance)
-  // The animation pose and attachments were changed after the player's
-  // normal world-transform pass. Recompute transforms before the next draw.
-  skeleton.updateWorldTransform()
 }
 
 function applyAnimation(instance, name, loop = true) {
@@ -349,8 +326,6 @@ function applyAnimation(instance, name, loop = true) {
     const segments = definition?.composite || definition?.animations
     if (Array.isArray(segments) && segments.length) {
       const available = new Set(getAnimationNames(instance))
-      // A composite can be a sequence of single animations or parallel layers.
-      // A nested array represents animations that begin together on separate tracks.
       const definitions = new Map(props.composites.map((entry) => [entry?.name, entry]))
       const expandSegments = (items, ancestors = []) => {
         const expanded = []
@@ -454,9 +429,6 @@ function computeTrimmedBounds(skeleton) {
     if (slot.color && slot.color.a <= 0) continue
     const attachment = slot.getAttachment?.()
     if (!attachment || attachment.color?.a <= 0 || typeof attachment.computeWorldVertices !== 'function') continue
-    // Only renderable region/mesh attachments belong in visual bounds.
-    // Bounding boxes, clipping polygons and paths can be much larger than the
-    // costume itself and are not drawn as textured geometry.
     const isMesh = Number.isFinite(attachment.worldVerticesLength) && attachment.worldVerticesLength > 0
       && Boolean(attachment.region) && attachment.regionUVs?.length > 0
     const isRegion = !isMesh && Boolean(attachment.region) && attachment.offset?.length === 8
@@ -504,8 +476,6 @@ function animateWheelZoom(timestamp) {
   if (!camera || !cameraViewReady || !wheelAnchor) { wheelAnimationFrame = 0; return }
   const elapsed = wheelLastFrameTime ? Math.max(0, timestamp - wheelLastFrameTime) : 16
   wheelLastFrameTime = timestamp
-  // Exponential smoothing is frame-rate independent. Capping elapsed time made
-  // zoom lag unpredictably on slower or temporarily busy frames.
   const easing = 1 - Math.exp(-elapsed / 75)
   const nextZoom = camera.zoom + (wheelTargetZoom - camera.zoom) * easing
   camera.zoom = Math.abs(wheelTargetZoom - nextZoom) < 0.00001 ? wheelTargetZoom : nextZoom
@@ -545,17 +515,12 @@ function fitCameraToSkeleton(instance) {
     return false
   }
 
-  // SpinePlayer calls its first renderer.resize() immediately after the
-  // success callback. Use the same DPR-aware client dimensions here so the
-  // initial fit does not depend on the canvas's pre-resize backing size.
   const dpr = window.devicePixelRatio || 1
   const viewportWidth = Math.max(1, Math.round((canvas.clientWidth || canvas.width / dpr) * dpr))
   const viewportHeight = Math.max(1, Math.round((canvas.clientHeight || canvas.height / dpr) * dpr))
   if (!camera) camera = new OrthoCamera(viewportWidth, viewportHeight)
   else camera.setViewport(viewportWidth, viewportHeight)
 
-  // Fit the active skin's visible attachments. This runs after the selected
-  // animation and skin have been applied, and again whenever a skin changes.
   const paddingX = Math.max(bounds.size.x * 0.06, 1)
   const paddingY = Math.max(bounds.size.y * 0.06, 1)
   camera.position.x = bounds.offset.x + bounds.size.x / 2
@@ -609,8 +574,6 @@ function initializeCamera(instance) {
   }
 
   if (!chosenSkin) {
-    // Probe every available skin and choose a non-empty visible costume rather
-    // than accepting the first skin whose broad setup bounds happen to be valid.
     let bestArea = -1
     for (const skin of skins) {
       const name = skin?.name
@@ -650,10 +613,42 @@ function initializeCamera(instance) {
   wheelCanvas = canvas
   panHandlers = {
     down: (event) => {
-      if (event.button !== 0 || !event.isPrimary || !camera || !cameraViewReady) return
+      if (!camera || !cameraViewReady) return
+      if (event.pointerType === 'touch') {
+        event.preventDefault()
+        touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+        try { canvas.setPointerCapture(event.pointerId) } catch {  }
+        if (touchPointers.size >= 2) {
+          activePointerId = null
+          lastPointer = null
+          canvas.classList.remove('is-panning')
+          if (wheelAnimationFrame) cancelAnimationFrame(wheelAnimationFrame)
+          wheelAnimationFrame = 0
+          wheelAnchor = null
+          wheelLastFrameTime = 0
+          const points = [...touchPointers.values()]
+          const dx = points[1].x - points[0].x
+          const dy = points[1].y - points[0].y
+          const rect = canvas.getBoundingClientRect()
+          const centerX = (points[0].x + points[1].x) / 2
+          const centerY = (points[0].y + points[1].y) / 2
+          const nx = Math.max(-1, Math.min(1, ((centerX - rect.left) / rect.width) * 2 - 1))
+          const ny = Math.max(-1, Math.min(1, 1 - ((centerY - rect.top) / rect.height) * 2))
+          pinchState = {
+            distance: Math.max(1, Math.hypot(dx, dy)),
+            zoom: camera.zoom,
+            anchorX: camera.position.x + nx * (camera.viewportWidth / 2) * camera.zoom,
+            anchorY: camera.position.y + ny * (camera.viewportHeight / 2) * camera.zoom,
+            nx, ny,
+          }
+        } else {
+          activePointerId = event.pointerId
+          lastPointer = { x: event.clientX, y: event.clientY }
+        }
+        return
+      }
+      if (event.button !== 0 || !event.isPrimary) return
       event.preventDefault()
-      // Stop an in-flight cursor-anchored zoom before starting a drag. Otherwise
-      // its stale anchor can pull the character back while the user is panning.
       if (wheelAnimationFrame) cancelAnimationFrame(wheelAnimationFrame)
       wheelAnimationFrame = 0
       wheelAnchor = null
@@ -662,9 +657,46 @@ function initializeCamera(instance) {
       activePointerId = event.pointerId
       lastPointer = { x: event.clientX, y: event.clientY }
       canvas.classList.add('is-panning')
-      try { canvas.setPointerCapture(event.pointerId) } catch { /* Pointer capture may be unavailable. */ }
+      try { canvas.setPointerCapture(event.pointerId) } catch {  }
     },
     move: (event) => {
+      if (event.pointerType === 'touch' && touchPointers.has(event.pointerId)) {
+        touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+        if (touchPointers.size >= 2 && pinchState) {
+          event.preventDefault()
+          const points = [...touchPointers.values()]
+          const dx = points[1].x - points[0].x
+          const dy = points[1].y - points[0].y
+          const distance = Math.max(1, Math.hypot(dx, dy))
+          const rect = canvas.getBoundingClientRect()
+          if (!rect.width || !rect.height) return
+          const centerX = (points[0].x + points[1].x) / 2
+          const centerY = (points[0].y + points[1].y) / 2
+          const nx = Math.max(-1, Math.min(1, ((centerX - rect.left) / rect.width) * 2 - 1))
+          const ny = Math.max(-1, Math.min(1, 1 - ((centerY - rect.top) / rect.height) * 2))
+          const nextZoom = Math.min(defaultCameraZoom * 4, Math.max(defaultCameraZoom * 0.08, pinchState.zoom * pinchState.distance / distance))
+          camera.zoom = nextZoom
+          camera.position.x = pinchState.anchorX - nx * (camera.viewportWidth / 2) * nextZoom
+          camera.position.y = pinchState.anchorY - ny * (camera.viewportHeight / 2) * nextZoom
+          cameraZoomValue = nextZoom
+          cameraXValue = camera.position.x
+          cameraYValue = camera.position.y
+          syncCameraToRenderer()
+          emit('zoom', Math.round(defaultCameraZoom / cameraZoomValue * 100))
+        } else if (touchPointers.size === 1 && event.pointerId === activePointerId && lastPointer) {
+          const rect = canvas.getBoundingClientRect()
+          if (!rect.width || !rect.height) return
+          const deltaX = event.clientX - lastPointer.x
+          const deltaY = event.clientY - lastPointer.y
+          lastPointer = { x: event.clientX, y: event.clientY }
+          camera.position.x -= deltaX * camera.viewportWidth / rect.width * camera.zoom
+          camera.position.y += deltaY * camera.viewportHeight / rect.height * camera.zoom
+          cameraXValue = camera.position.x
+          cameraYValue = camera.position.y
+          syncCameraToRenderer()
+        }
+        return
+      }
       if (event.pointerId !== activePointerId || !lastPointer || !camera) return
       const rect = canvas.getBoundingClientRect()
       if (!rect.width || !rect.height) return
@@ -682,6 +714,20 @@ function initializeCamera(instance) {
       syncCameraToRenderer()
     },
     up: (event) => {
+      if (event.pointerType === 'touch') {
+        touchPointers.delete(event.pointerId)
+        if (touchPointers.size < 2) pinchState = null
+        if (touchPointers.size === 1) {
+          const [id, point] = [...touchPointers.entries()][0]
+          activePointerId = id
+          lastPointer = { x: point.x, y: point.y }
+        } else if (touchPointers.size === 0) {
+          activePointerId = null
+          lastPointer = null
+          canvas.classList.remove('is-panning')
+        }
+        return
+      }
       if (event.pointerId !== activePointerId) return
       activePointerId = null
       lastPointer = null
@@ -786,8 +832,6 @@ function createPlayer(config, token) {
     showLoading: true,
     backgroundColor: '00000000',
     preserveDrawingBuffer: true,
-    // BrownDust2 atlases use straight alpha (no pma:true in the atlas header).
-    // Match the WebGL blend mode to the source texture data to avoid bright halos.
     premultipliedAlpha: false,
     alpha: true,
     ...config,
@@ -802,13 +846,8 @@ function createPlayer(config, token) {
       padBottom: 50,
       transitionTime: 0,
     },
-    update: (instance) => {
-      // Spine Player resets its renderer camera from the viewport every frame.
-      // Re-apply our user camera only after that reset, while tracking resizes.
+    update: () => {
       if (camera && cameraViewReady) syncCameraToRenderer()
-      // Animation timelines can rewrite slot colors every frame. Re-apply
-      // hidden layers after the pose is evaluated and before Spine draws it.
-      applyHiddenLayers(instance)
     },
     success: (instance) => {
       handleSuccess(instance, token)
@@ -888,7 +927,6 @@ watch(() => props.animation, (name) => {
     player.skeleton.updateWorldTransform()
   }
   applyHiddenLayers(player)
-  player.drawFrame?.(false)
   player.drawFrame?.(false)
   if (props.playing) player.play()
 })
@@ -995,10 +1033,14 @@ function resetView() {
 function setLayerVisible(name, visible) {
   if (visible) hiddenLayers.delete(name)
   else hiddenLayers.add(name)
-  if (player) {
-    if (visible) restoreVisibleLayerAttachments(player)
-    else applyHiddenLayers(player)
+  const slot = player?.skeleton?.slots?.find((item) => item.data?.name === name)
+  if (slot && visible) {
+    if (slot.color) slot.color.a = slot.data?.color?.a ?? 1
+    if (slot.darkColor) slot.darkColor.a = slot.data?.darkColor?.a ?? 1
   }
+  if (player) applyHiddenLayers(player)
+  player?.skeleton?.updateWorldTransform()
+  player?.drawFrame?.(false)
 }
 function setAllLayersVisible(visible, names = []) {
   names.forEach((name) => {
@@ -1011,9 +1053,60 @@ function setAllLayersVisible(visible, names = []) {
     if (visible) hiddenLayers.delete(name)
     else hiddenLayers.add(name)
   })
-  if (player) {
-    if (visible) restoreVisibleLayerAttachments(player)
-    else applyHiddenLayers(player)
+  if (visible) {
+    ;(player?.skeleton?.slots || []).forEach((slot) => {
+      if (slot.color) slot.color.a = slot.data?.color?.a ?? 1
+      if (slot.darkColor) slot.darkColor.a = slot.data?.darkColor?.a ?? 1
+    })
+  }
+  if (player) applyHiddenLayers(player)
+  player?.skeleton?.updateWorldTransform()
+  player?.drawFrame?.(false)
+}
+function prepareScreenshotRenderSize(instance, canvas, renderer, targetSize, dpr) {
+  const previousWidth = canvas.width
+  const previousHeight = canvas.height
+  const elements = [host, instance.dom, canvas].filter(Boolean)
+  const previousStyles = elements.map(element => element.getAttribute('style'))
+  const cssSize = `${targetSize / dpr}px`
+  const setSize = element => {
+    element.style.setProperty('width', cssSize, 'important')
+    element.style.setProperty('height', cssSize, 'important')
+    element.style.setProperty('min-width', cssSize, 'important')
+    element.style.setProperty('min-height', cssSize, 'important')
+    element.style.setProperty('max-width', cssSize, 'important')
+    element.style.setProperty('max-height', cssSize, 'important')
+  }
+  const restore = () => {
+    elements.forEach((element, index) => {
+      const style = previousStyles[index]
+      if (style === null) element.removeAttribute('style')
+      else element.setAttribute('style', style)
+    })
+    canvas.width = previousWidth
+    canvas.height = previousHeight
+    renderer.resize(previousWidth, previousHeight)
+  }
+  try {
+    if (host) {
+      host.style.setProperty('position', 'fixed', 'important')
+      host.style.setProperty('left', '-10000px', 'important')
+      host.style.setProperty('top', '0', 'important')
+      host.style.setProperty('overflow', 'hidden', 'important')
+      host.style.setProperty('visibility', 'hidden', 'important')
+      host.style.setProperty('pointer-events', 'none', 'important')
+      setSize(host)
+    }
+    if (instance.dom) setSize(instance.dom)
+    setSize(canvas)
+    void host?.getBoundingClientRect()
+    canvas.width = targetSize
+    canvas.height = targetSize
+    renderer.resize(targetSize, targetSize)
+    return restore
+  } catch (error) {
+    restore()
+    throw error
   }
 }
 async function saveScreenshot(transparent = false) {
@@ -1031,23 +1124,19 @@ async function saveScreenshot(transparent = false) {
   const prevZoom = cam.zoom
   const prevWidth = canvas.width
   const prevHeight = canvas.height
-  const prevStyleWidth = canvas.style.getPropertyValue('width')
-  const prevStyleHeight = canvas.style.getPropertyValue('height')
-  const prevStyleWidthPriority = canvas.style.getPropertyPriority('width')
-  const prevStyleHeightPriority = canvas.style.getPropertyPriority('height')
   const dpr = window.devicePixelRatio || 1
 
   const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 0
   const maxRenderbufferSize = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || maxTextureSize
   const maxViewportDims = gl.getParameter(gl.MAX_VIEWPORT_DIMS) || [maxRenderbufferSize, maxRenderbufferSize]
   const maxSupportedSize = Math.min(maxTextureSize, maxRenderbufferSize, maxViewportDims[0], maxViewportDims[1])
-  if (maxSupportedSize < 3000) {
-    throw new Error(`This device supports only ${maxSupportedSize}px screenshots; 3000×3000 export is unavailable.`)
+  if (!maxSupportedSize || maxSupportedSize < 512) {
+    throw new Error(`This device does not support a usable screenshot size (maximum: ${maxSupportedSize}px).`)
   }
-  const targetSize = 3000
+  const isMobileDevice = window.matchMedia('(max-width: 820px)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  const targetSize = Math.min(3000, maxSupportedSize, isMobileDevice ? 2048 : 3000)
   const scaleW = targetSize / prevWidth
   const scaleH = targetSize / prevHeight
-  // Render the square export viewport at full resolution without letterboxing.
   const scale = Math.max(scaleW, scaleH) || 1
   const previousBackground = instance.config?.backgroundColor || '#171720'
   const previousDomBackground = instance.dom?.style.backgroundColor || ''
@@ -1066,25 +1155,21 @@ async function saveScreenshot(transparent = false) {
   const filename = `BD2_Studio_${characterId}_${animationName}.png`
 
   let screenshotBlobPromise
+  let restoreRenderSize = () => {}
 
   try {
     if (!props.useCurrentCamera && defaultCameraPosition) {
       cam.position.x = defaultCameraPosition.x
       cam.position.y = defaultCameraPosition.y
     }
-    // Preserve the current screen-space zoom while increasing the render viewport to 3000×3000.
     cam.zoom = prevZoom / scale
     cam.update()
     setTransparentBackground(transparent)
 
-    canvas.style.setProperty('width', `${targetSize / dpr}px`, 'important')
-    canvas.style.setProperty('height', `${targetSize / dpr}px`, 'important')
-    canvas.width = targetSize
-    canvas.height = targetSize
-    renderer.resize(targetSize, targetSize)
+    restoreRenderSize = prepareScreenshotRenderSize(instance, canvas, renderer, targetSize, dpr)
 
     if (canvas.width !== targetSize || canvas.height !== targetSize) {
-      throw new Error(`High-resolution render was reduced to ${canvas.width}×${canvas.height}; the image was not exported.`)
+      throw new Error(`The renderer could not reach the requested screenshot size (${canvas.width}×${canvas.height}).`)
     }
 
     const renderCamera = renderer.camera
@@ -1115,8 +1200,6 @@ async function saveScreenshot(transparent = false) {
         const destY = box.y / 100 * targetSize
         const destWidth = box.width / 100 * targetSize
         const destHeight = box.height / 100 * targetSize
-        // Match object-fit: cover: keep the uploaded image's proportions and
-        // crop its excess instead of stretching it into the square export box.
         const sourceAspect = bgImage.naturalWidth / bgImage.naturalHeight
         const destAspect = destWidth / destHeight
         if (sourceAspect > destAspect) {
@@ -1134,24 +1217,16 @@ async function saveScreenshot(transparent = false) {
     }
     context.drawImage(canvas, 0, 0, targetSize, targetSize)
 
-    // Encode asynchronously, restoring the live preview before the browser paints.
     screenshotBlobPromise = new Promise((resolve, reject) => {
       screenshotCanvas.toBlob(value => value ? resolve(value) : reject(new Error('Could not encode the PNG screenshot.')), 'image/png')
     })
   } finally {
-    canvas.width = prevWidth
-    canvas.height = prevHeight
-    if (prevStyleWidth) canvas.style.setProperty('width', prevStyleWidth, prevStyleWidthPriority)
-    else canvas.style.removeProperty('width')
-    if (prevStyleHeight) canvas.style.setProperty('height', prevStyleHeight, prevStyleHeightPriority)
-    else canvas.style.removeProperty('height')
-    renderer.resize(prevWidth, prevHeight)
-
     cam.position.x = prevPosX
     cam.position.y = prevPosY
     cam.zoom = prevZoom
     cam.update()
     setTransparentBackground(false)
+    restoreRenderSize()
     const renderCamera = renderer.camera
     if (renderCamera) {
       renderCamera.position.x = cam.position.x
@@ -1167,12 +1242,12 @@ async function saveScreenshot(transparent = false) {
   const link = document.createElement('a')
   link.href = url
   link.download = filename
+  link.style.display = 'none'
   document.body.appendChild(link)
   link.click()
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
-
 
 function drawExportFrame(context, width, height, sourceCanvas, transparent) {
   context.clearRect(0, 0, width, height)
@@ -1612,6 +1687,22 @@ function moveImageTransform(event) {
     backgroundImageRect.value = next
   }
 }
+function zoomBackgroundImage(event) {
+  if (!backgroundImage.value || !backgroundImageEditMode.value) return
+  const current = backgroundImageRect.value
+  const factor = Math.exp(-event.deltaY * 0.0015)
+  const nextWidth = clamp(current.width * factor, 5, 500)
+  const nextHeight = clamp(current.height * factor, 5, 500)
+  const widthDelta = nextWidth - current.width
+  const heightDelta = nextHeight - current.height
+  backgroundImageRect.value = {
+    x: current.x - widthDelta / 2,
+    y: current.y - heightDelta / 2,
+    width: nextWidth,
+    height: nextHeight,
+  }
+}
+
 function endImageTransform() {
   imagePointerAction = null
   imagePointerStart = null
@@ -1653,28 +1744,28 @@ onBeforeUnmount(() => {
     </div>
     <div ref="hostEl" data-spine-preview-host class="spine-preview-host"></div>
     <div v-if="backgroundImage && backgroundImageEditMode" class="preview-image-controls">
-      <div class="preview-image-outline" :style="{ left: backgroundImageRect.x + '%', top: backgroundImageRect.y + '%', width: backgroundImageRect.width + '%', height: backgroundImageRect.height + '%' }" @pointerdown="beginImageTransform($event, 'move')">
-        <button v-for="handle in ['nw','ne','sw','se']" :key="handle" type="button" class="preview-image-handle" :class="handle" :aria-label="'Resize background image from ' + handle" @pointerdown.stop="beginImageTransform($event, handle)" />
+      <div class="preview-image-outline" :style="{ left: backgroundImageRect.x + '%', top: backgroundImageRect.y + '%', width: backgroundImageRect.width + '%', height: backgroundImageRect.height + '%' }" @pointerdown="beginImageTransform($event, 'move')" @wheel.prevent.stop="zoomBackgroundImage">
+        <button v-for="handle in ['nw','ne','sw','se']" :key="handle" type="button" class="preview-image-handle" :class="handle" :aria-label="t('Resize background image from') + ' ' + handle" @pointerdown.stop="beginImageTransform($event, handle)" />
       </div>
-      <div class="preview-image-instructions">DRAG IMAGE TO MOVE · DRAG CORNER HANDLES TO STRETCH</div>
+      <div class="preview-image-instructions">{{ t('DRAG IMAGE TO MOVE · DRAG CORNER HANDLES TO STRETCH · SCROLL TO ZOOM') }}</div>
     </div>
     <div class="preview-background-tools">
-      <button ref="colorPickerButtonEl" type="button" class="preview-tool-button" @click="colorPickerOpen = !colorPickerOpen">COLOR</button>
-      <button type="button" class="preview-tool-button" @click="openImagePicker">UPLOAD IMAGE</button>
-      <button v-if="backgroundImage" type="button" class="preview-tool-button" @click="backgroundImageEditMode = !backgroundImageEditMode">{{ backgroundImageEditMode ? 'DONE' : 'EDIT IMAGE' }}</button>
-      <button v-if="backgroundImage" type="button" class="preview-tool-button" @click="clearBackgroundImage">REMOVE IMAGE</button>
+      <button ref="colorPickerButtonEl" type="button" class="preview-tool-button" :class="{ active: colorPickerOpen }" :aria-expanded="colorPickerOpen" @click="colorPickerOpen = !colorPickerOpen">{{ t('COLOR') }}</button>
+      <button type="button" class="preview-tool-button" @click="openImagePicker">{{ t('UPLOAD IMAGE') }}</button>
+      <button v-if="backgroundImage" type="button" class="preview-tool-button" @click="backgroundImageEditMode = !backgroundImageEditMode">{{ backgroundImageEditMode ? t('DONE') : t('EDIT IMAGE') }}</button>
+      <button v-if="backgroundImage" type="button" class="preview-tool-button" @click="clearBackgroundImage">{{ t('REMOVE IMAGE') }}</button>
       <input ref="imageFileInput" class="preview-file-input" type="file" accept="image/*" @change="loadBackgroundImage" />
     </div>
     <div v-if="colorPickerOpen" ref="colorPickerPopoverEl" class="preview-color-popover">
-      <div class="preview-color-heading">BACKGROUND COLOR</div>
-      <div ref="hueSquareEl" class="preview-color-square" role="application" aria-label="Saturation and brightness picker"
+      <div class="preview-color-heading">{{ t('BACKGROUND COLOR') }}</div>
+      <div ref="hueSquareEl" class="preview-color-square" role="application" :aria-label="t('Saturation and brightness picker')"
         :style="{ backgroundColor: 'hsl(' + pickerHue + ', 100%, 50%)' }" @pointerdown="startSquareAdjust">
         <span class="preview-color-square-white"></span>
         <span class="preview-color-square-black"></span>
         <span class="preview-color-square-cursor" :style="{ left: hsvColor().s + '%', top: (100 - hsvColor().v) + '%' }"></span>
       </div>
       <input class="preview-hue-slider" type="range" min="0" max="360" step="1" :value="Math.round(hsvColor().h)"
-        aria-label="Hue" @input="setHueFromSlider($event.target.value)" />
+        :aria-label="t('Hue')" @input="setHueFromSlider($event.target.value)" />
       <div class="preview-color-modes">
         <button v-for="mode in ['RGB','HEX','HSL']" :key="mode" type="button" :class="{ selected: colorMode === mode }" @click="colorMode = mode">{{ mode }}</button>
       </div>
@@ -1691,7 +1782,7 @@ onBeforeUnmount(() => {
         <label>S <input type="number" min="0" max="100" :value="hslColor().s" @change="setHslColor(hslColor().h, $event.target.value, hslColor().l)" /></label>
         <label>L <input type="number" min="0" max="100" :value="hslColor().l" @change="setHslColor(hslColor().h, hslColor().s, $event.target.value)" /></label>
       </div>
-      <button type="button" class="preview-reset-color" @click="resetBackgroundColor">RESET DEFAULT COLOR</button>
+      <button type="button" class="preview-reset-color" @click="resetBackgroundColor">{{ t('RESET DEFAULT COLOR') }}</button>
     </div>
   </div>
 </template>
@@ -1756,6 +1847,8 @@ onBeforeUnmount(() => {
 .preview-background-tools { position:absolute; z-index:8; top:12px; right:12px; display:flex; gap:6px; align-items:center; }
 .preview-tool-button { min-height:30px; padding:0 9px; border:1px solid #393642; border-radius:6px; background:#1b1922ef; color:#e5d9f5; font:700 9px 'DM Sans',sans-serif; letter-spacing:.45px; cursor:pointer; transition:background-color .16s ease,border-color .16s ease,color .16s ease; }
 .preview-tool-button:hover { border-color:#b59ae8; background:#392d4d; color:#fff; }
+.preview-tool-button.active,
+.preview-tool-button.active:hover { border-color:#594873; background:#2a2435; color:#fff; }
 .preview-tool-button:focus-visible { outline:2px solid #b99be8; outline-offset:2px; }
 .preview-file-input { display:none; }
 .preview-color-popover { position:absolute; z-index:12; top:49px; right:12px; width:280px; max-width:calc(100vw - 32px); padding:12px; border:1px solid #55466b; border-radius:10px; background:#1b1922f5; box-shadow:0 12px 35px #000a; color:#eee8f6; }
@@ -1771,10 +1864,20 @@ onBeforeUnmount(() => {
 .preview-reset-color { width:100%; min-height:30px; margin-top:10px; border:1px solid #66547f; border-radius:5px; background:#292331; color:#e5d9f5; font-size:10px; font-weight:700; cursor:pointer; }
 .preview-reset-color:hover { background:#392d4d; border-color:#b59ae8; }
 .preview-color-modes { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; margin-bottom:9px; }
-.preview-color-modes button { min-height:27px; border:1px solid #393342; border-radius:5px; background:#24212d; color:#aaa0b9; font-size:9px; font-weight:700; cursor:pointer; transition:background .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease; }
-.preview-color-modes button:hover { border-color:#9272c2; background:#332a40; color:#f4edff; }
-.preview-color-modes button:focus-visible { outline:2px solid #b99be8; outline-offset:2px; }
-.preview-color-modes button.selected { border-color:#a98bd8; background:#46365c; color:#fff; box-shadow:inset 0 0 0 1px #9272c255; }
+.preview-color-modes button {
+  min-height:32px; padding:8px 10px; border:1px solid transparent; border-radius:5px;
+  background:transparent; color:#ddd8e5; font:inherit; font-size:10px; text-align:center;
+  cursor:pointer; transition:background-color .15s ease,border-color .15s ease,color .15s ease;
+}
+.preview-color-modes button:hover:not(.selected) {
+  border-color:#393443; background:#211f29; color:#eee5ff;
+}
+.preview-color-modes button.selected,
+.preview-color-modes button.selected:hover {
+  border-color:#594873; background:#2a2435; color:#fff;
+}
+.preview-color-modes button:focus,
+.preview-color-modes button:focus-visible { outline:none; box-shadow:none; }
 .preview-color-fields input { appearance:textfield; -moz-appearance:textfield; transition:border-color .15s ease,background .15s ease,box-shadow .15s ease; }
 .preview-color-fields input::-webkit-inner-spin-button,
 .preview-color-fields input::-webkit-outer-spin-button { -webkit-appearance:none; appearance:none; margin:0; }
@@ -1785,10 +1888,9 @@ onBeforeUnmount(() => {
 .preview-color-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
 .preview-color-fields.hex { grid-template-columns:1fr; }
 .preview-color-fields label { display:grid; gap:4px; color:#a99eb7; font-size:9px; }
-.preview-color-fields input { width:100%; min-width:0; height:30px; box-sizing:border-box; padding:0 6px; border:1px solid #40394b; border-radius:5px; outline:0; background:#111016; color:#f5efff; font:11px 'DM Mono',monospace; }
+.preview-color-fields input { width:100%; min-width:0; height:30px; box-sizing:border-box; padding:0 6px; border:1px solid #40394b; border-radius:5px; outline:0; background:#111016; color:#f5efff; font:11px 'IBM Plex Mono',monospace; }
 .preview-color-fields input:focus { border-color:#9272c2; }
 .spine-preview-host { z-index:1; }
 .spine-preview-host .spine-player { background:transparent !important; }
 .spine-preview-host canvas { background:transparent !important; }
-
 </style>
