@@ -71,8 +71,19 @@ const props = defineProps({
 const emit = defineEmits(['animations', 'skins', 'layers', 'error', 'ready', 'progress', 'duration', 'zoom'])
 
 let player = null
-let spineRuntime = { SpinePlayer, Vector2, OrthoCamera }
+let spineRuntime = { SpinePlayer, Vector2, OrthoCamera, Physics: null }
 let loadedRuntimeVersion = '4.1'
+
+function updateSkeletonWorldTransform(skeleton, physicsMode = 'none') {
+  if (!skeleton) return
+  if (loadedRuntimeVersion === '4.2') {
+    const physics = spineRuntime.Physics
+    if (!physics) throw new Error('Spine 4.2 Physics API is unavailable.')
+    skeleton.updateWorldTransform(physicsMode === 'update' ? physics.update : physics.none)
+    return
+  }
+  skeleton.updateWorldTransform()
+}
 let objectUrls = []
 const hostEl = ref(null)
 let host = null
@@ -316,7 +327,7 @@ function applyAnimation(instance, name, loop = true) {
     state.clearTrack(0)
     state.clearTrack(1)
     instance.skeleton?.setToSetupPose()
-    instance.skeleton?.updateWorldTransform()
+    updateSkeletonWorldTransform(instance.skeleton)
     if (idleName && available.has(idleName) && available.has(name)) {
       state.setAnimation(0, idleName, true)
       state.setAnimation(1, name, loop)
@@ -498,7 +509,7 @@ function fitCameraToSkeleton(instance) {
   const canvas = instance?.canvas
   if (!skeleton || !renderCamera || !canvas) return false
 
-  skeleton.updateWorldTransform()
+  updateSkeletonWorldTransform(skeleton)
   const trimmed = computeTrimmedBounds(skeleton)
   const offset = new spineRuntime.Vector2()
   const size = new spineRuntime.Vector2()
@@ -556,7 +567,7 @@ function initializeCamera(instance) {
   if (!skeleton || !canvas || !renderCamera) return ''
 
   skeleton.setToSetupPose()
-  skeleton.updateWorldTransform()
+  updateSkeletonWorldTransform(skeleton)
   const skins = skeleton.data?.skins || []
   const preferredSkin = [props.skin, skeleton.skin?.name].find((name) =>
     name && skins.some((skin) => skin?.name === name)
@@ -566,7 +577,7 @@ function initializeCamera(instance) {
   if (preferredSkin) {
     skeleton.setSkinByName(preferredSkin)
     skeleton.setSlotsToSetupPose()
-    skeleton.updateWorldTransform()
+    updateSkeletonWorldTransform(skeleton)
     const visibleBounds = computeTrimmedBounds(skeleton)
     const testOffset = new spineRuntime.Vector2()
     const testSize = new spineRuntime.Vector2()
@@ -584,7 +595,7 @@ function initializeCamera(instance) {
       if (!name) continue
       skeleton.setSkinByName(name)
       skeleton.setSlotsToSetupPose()
-      skeleton.updateWorldTransform()
+      updateSkeletonWorldTransform(skeleton)
       const bounds = computeTrimmedBounds(skeleton)
       if (bounds) {
         const area = bounds.size.x * bounds.size.y
@@ -608,7 +619,7 @@ function initializeCamera(instance) {
     if (chosenSkin) {
       skeleton.setSkinByName(chosenSkin)
       skeleton.setSlotsToSetupPose()
-      skeleton.updateWorldTransform()
+      updateSkeletonWorldTransform(skeleton)
     }
   }
 
@@ -782,7 +793,7 @@ function restoreActiveSkin(instance) {
   if (!exists) return
   skeleton.setSkinByName(activeSkinName)
   skeleton.setSlotsToSetupPose()
-  skeleton.updateWorldTransform()
+  updateSkeletonWorldTransform(skeleton)
 }
 
 function handleSuccess(instance, token) {
@@ -810,7 +821,7 @@ function handleSuccess(instance, token) {
   restoreActiveSkin(instance)
   if (instance.animationState && instance.skeleton) {
     instance.animationState.apply(instance.skeleton)
-    instance.skeleton.updateWorldTransform()
+    updateSkeletonWorldTransform(instance.skeleton)
   }
   applyHiddenLayers(instance)
   fitCameraToSkeleton(instance)
@@ -877,6 +888,7 @@ async function load() {
         SpinePlayer: runtime.SpinePlayer,
         Vector2: runtime.Vector2,
         OrthoCamera: runtime.OrthoCamera,
+        Physics: runtime.Physics,
       }
       loadedRuntimeVersion = '4.2'
     } else if (props.runtimeVersion !== '4.2' && loadedRuntimeVersion !== '4.1') {
@@ -947,7 +959,7 @@ watch(() => props.animation, (name) => {
   restoreActiveSkin(player)
   if (player.animationState && player.skeleton) {
     player.animationState.apply(player.skeleton)
-    player.skeleton.updateWorldTransform()
+    updateSkeletonWorldTransform(player.skeleton)
   }
   applyHiddenLayers(player)
   player.drawFrame?.(false)
@@ -965,7 +977,7 @@ function applySelectedSkin(instance, skinName) {
   if (props.animation) applyAnimation(instance, props.animation, props.loop)
   instance.animationState?.apply(skeleton)
   applyHiddenLayers(instance)
-  skeleton.updateWorldTransform()
+  updateSkeletonWorldTransform(skeleton)
   instance.drawFrame?.(false)
 }
 
@@ -1019,7 +1031,7 @@ function seek(progress) {
   if (!entry || !Number.isFinite(duration) || duration <= 0) return
   entry.trackTime = Math.max(0, Math.min(duration, progress * duration))
   state.apply(player.skeleton)
-  player.skeleton.updateWorldTransform()
+  updateSkeletonWorldTransform(player.skeleton)
 }
 function setZoom(value) {
   if (!camera || !cameraViewReady) return
@@ -1062,7 +1074,7 @@ function setLayerVisible(name, visible) {
     if (slot.darkColor) slot.darkColor.a = slot.data?.darkColor?.a ?? 1
   }
   if (player) applyHiddenLayers(player)
-  player?.skeleton?.updateWorldTransform()
+  updateSkeletonWorldTransform(player?.skeleton)
   player?.drawFrame?.(false)
 }
 function setAllLayersVisible(visible, names = []) {
@@ -1083,7 +1095,7 @@ function setAllLayersVisible(visible, names = []) {
     })
   }
   if (player) applyHiddenLayers(player)
-  player?.skeleton?.updateWorldTransform()
+  updateSkeletonWorldTransform(player?.skeleton)
   player?.drawFrame?.(false)
 }
 function prepareScreenshotRenderSize(instance, canvas, renderer, targetSize, dpr) {
@@ -1405,7 +1417,7 @@ async function exportAnimation(format, transparent = false) {
     restoreActiveSkin(instance)
     applyHiddenLayers(instance)
     state.apply(skeleton)
-    skeleton.updateWorldTransform()
+    updateSkeletonWorldTransform(skeleton)
     instance.pause()
 
     const duration = getExportAnimationDuration(instance)
@@ -1433,7 +1445,7 @@ async function exportAnimation(format, transparent = false) {
         instance.drawFrame?.(false);drawExportFrame(context,frameCanvas.width,frameCanvas.height,canvas,transparent)
         samples.push(createGifSample(frameCanvas,sampleCanvas,sampleContext))
         emit('progress',((frame+1)/totalFrames)*0.4)
-        if(frame<totalFrames-1){state.update(stepDuration);state.apply(skeleton);skeleton.updateWorldTransform()}
+        if(frame<totalFrames-1){state.update(stepDuration);state.apply(skeleton);updateSkeletonWorldTransform(skeleton, 'update')}
         if(frame%8===7)await new Promise(resolve=>requestAnimationFrame(resolve))
       }
       gifPalette=createGifPalette(samples,transparent)
@@ -1441,7 +1453,7 @@ async function exportAnimation(format, transparent = false) {
       gifLookup=createPaletteLookup(visiblePalette)
       gifEncoder=GIFEncoder({initialCapacity:Math.max(1<<20,frameCanvas.width*frameCanvas.height)})
       applyAnimation(instance,props.animation,false);restoreActiveSkin(instance);applyHiddenLayers(instance)
-      state.apply(skeleton);skeleton.updateWorldTransform()
+      state.apply(skeleton);updateSkeletonWorldTransform(skeleton)
     } else {
       const quality = new Quality({ bitrate: 10000000 })
       const encodingOptions = {
@@ -1478,7 +1490,7 @@ async function exportAnimation(format, transparent = false) {
           zip.file(`frame_${String(frame).padStart(4,'0')}.png`,blob)
         }else await videoSource.add(frame/fps,1/fps)
         emit('progress',(frame+1)/totalFrames);emit('duration',duration)
-        if(frame<totalFrames-1){state.update(stepDuration);state.apply(skeleton);skeleton.updateWorldTransform()}
+        if(frame<totalFrames-1){state.update(stepDuration);state.apply(skeleton);updateSkeletonWorldTransform(skeleton, 'update')}
         if(frame%5===4)await new Promise(resolve=>requestAnimationFrame(resolve))
       }
     }else{
@@ -1492,7 +1504,7 @@ async function exportAnimation(format, transparent = false) {
         if(frame===0){options.palette=gifPalette;options.repeat=0;if(transparent){options.transparent=true;options.transparentIndex=0}}
         gifEncoder.writeFrame(indices,frameCanvas.width,frameCanvas.height,options)
         emit('progress',0.4+((frame+1)/totalFrames)*0.6);emit('duration',duration)
-        if(frame<totalFrames-1){state.update(stepDuration);state.apply(skeleton);skeleton.updateWorldTransform()}
+        if(frame<totalFrames-1){state.update(stepDuration);state.apply(skeleton);updateSkeletonWorldTransform(skeleton, 'update')}
         if(frame%3===2)await new Promise(resolve=>requestAnimationFrame(resolve))
       }
     }
@@ -1531,7 +1543,7 @@ downloadExportBlob(new Blob([gifEncoder.bytes()], { type: 'image/gif' }), `${bas
       restoreActiveSkin(instance)
       applyHiddenLayers(instance)
       state.apply(skeleton)
-      skeleton.updateWorldTransform()
+      updateSkeletonWorldTransform(skeleton)
       instance.drawFrame?.(false)
       if (wasPlaying) instance.play()
       else instance.pause()
