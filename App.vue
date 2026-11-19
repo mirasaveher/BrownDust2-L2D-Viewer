@@ -52,12 +52,25 @@ const activeTab = ref('viewer')
 const mobilePanel = ref('')
 const changelogOpen = ref(false)
 const couponModalOpen = ref(false)
+const appBasePath = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`
+const couponRoutePath = `${appBasePath}coupon`
+function isCouponRoute() { return window.location.pathname === couponRoutePath || window.location.pathname === couponRoutePath.slice(0, -1) }
+function openCouponCenter() {
+  if (!isCouponRoute()) window.history.pushState({ couponCenter: true }, '', couponRoutePath)
+  couponModalOpen.value = true
+}
+function closeCouponCenter() {
+  couponModalOpen.value = false
+  if (isCouponRoute()) window.history.replaceState(window.history.state, '', appBasePath)
+}
+function syncCouponRoute() { couponModalOpen.value = isCouponRoute() }
 const couponClaiming = ref(false)
 const couponNicknameStorageKey = 'browndust2-l2d-viewer-coupon-nickname'
 const couponResultsStorageKey = 'browndust2-l2d-viewer-coupon-results'
 const couponNickname = ref((() => { try { return window.localStorage.getItem(couponNicknameStorageKey) || '' } catch { return '' } })())
 const couponResultStore = ref((() => { try { const value = JSON.parse(window.localStorage.getItem(couponResultsStorageKey) || '{}'); return value && typeof value === 'object' ? value : {} } catch { return {} } })())
 const couponList = [
+  { code: 'BURAJOMGMGAN', reward: '3 Draw Tickets', rewardRu: '3 Draw Tickets', expires: '22/11/2026' },
   { code: 'BD2RADIOMINE', reward: '3 Draw Tickets', rewardRu: '3 Draw Tickets', expires: '30/11/2026' },
   { code: '2026BD2NOV', reward: '3 Draw Tickets', rewardRu: '3 Draw Tickets', expires: '30/11/2026' },
   { code: 'BD2RADIOWOLF', reward: '3 Draw Tickets', rewardRu: '3 Draw Tickets', expires: '31/12/2026' },
@@ -650,11 +663,14 @@ function updateTimelineHover(event) {
 onMounted(() => {
   document.documentElement.lang = locale.value
   window.addEventListener('keydown', handleGlobalKeydown)
+  window.addEventListener('popstate', syncCouponRoute)
+  syncCouponRoute()
   document.addEventListener('pointerdown', handleExportMenuOutside)
   document.addEventListener('fullscreenchange', syncFullscreenState)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener('popstate', syncCouponRoute)
   document.removeEventListener('pointerdown', handleExportMenuOutside)
   document.removeEventListener('fullscreenchange', syncFullscreenState)
   document.removeEventListener('pointerdown', scheduleFullscreenControlsHide)
@@ -675,7 +691,7 @@ onBeforeUnmount(() => {
         <nav class="top-actions" :aria-label="locale === 'ru' ? 'Сообщество' : 'Community'">
           <a class="topbar-action topbar-action-telegram" href="https://t.me/browndust_2" target="_blank" rel="noopener noreferrer"  :data-tooltip="t('Open Telegram channel')" :aria-label="t('Open Brown Dust 2 Telegram channel')"><img class="topbar-brand-icon topbar-brand-icon-telegram" src="https://telegram.org/img/t_logo.png" alt="" /></a>
           <a class="topbar-action" href="https://github.com/mirasaveher/BrownDust2-L2D-Viewer" target="_blank" rel="noopener noreferrer"  :data-tooltip="t('Open GitHub repository')" :aria-label="t('Open GitHub repository')"><img class="topbar-brand-icon topbar-brand-icon-github" src="https://cdn.simpleicons.org/github/FFFFFF" alt="" /></a>
-          <div class="desktop-topbar-tools"><div ref="desktopLanguageMenuRef" class="language-menu-wrap" :class="{ open: languageMenuOpen }"><button type="button" class="topbar-action language-trigger" :data-tooltip="t('Change language')" :aria-label="t('Choose interface language')" :aria-expanded="languageMenuOpen" aria-haspopup="true" @click="languageMenuOpen = !languageMenuOpen"><Languages :size="18" :stroke-width="2" /></button><div v-if="languageMenuOpen" class="player-menu-popover language-popover" role="menu" :aria-label="t('Interface language')"><button type="button" class="language-option" :class="{ selected: locale === 'en' }" role="menuitemradio" :aria-checked="locale === 'en'" @click="setLocale('en')">English<span v-if="locale === 'en'">✓</span></button><button type="button" class="language-option" :class="{ selected: locale === 'ru' }" role="menuitemradio" :aria-checked="locale === 'ru'" @click="setLocale('ru')">Русский<span v-if="locale === 'ru'">✓</span></button></div></div><button type="button" class="topbar-action coupon-center-action" :data-tooltip="t('Coupon codes')" :aria-label="t('Open coupon center')" :aria-expanded="couponModalOpen" @click="couponModalOpen = true"><TicketPercent :size="18" :stroke-width="2" color="#ffffff" /></button><button type="button" class="topbar-action topbar-changelog-action" :data-tooltip="t('Changelog')" :aria-label="t('Open changelog')" :aria-expanded="changelogOpen" @click="changelogOpen = true"><FileText :size="20" :stroke-width="2.2" /></button></div><div class="mobile-topbar-tools"><button type="button" class="topbar-action mobile-language-toggle" :aria-label="t('Change language')" @click="setLocale(locale === 'en' ? 'ru' : 'en')"><span>{{ locale === 'en' ? 'EN' : 'RU' }}</span></button><button type="button" class="topbar-action coupon-center-action" :aria-label="t('Open coupon center')" @click="couponModalOpen = true"><TicketPercent :size="18" /></button><button type="button" class="topbar-action topbar-changelog-action" :aria-label="t('Open changelog')" @click="changelogOpen = true"><FileText :size="19" /></button></div>
+          <div class="desktop-topbar-tools"><div ref="desktopLanguageMenuRef" class="language-menu-wrap" :class="{ open: languageMenuOpen }"><button type="button" class="topbar-action language-trigger" :data-tooltip="t('Change language')" :aria-label="t('Choose interface language')" :aria-expanded="languageMenuOpen" aria-haspopup="true" @click="languageMenuOpen = !languageMenuOpen"><Languages :size="18" :stroke-width="2" /></button><div v-if="languageMenuOpen" class="player-menu-popover language-popover" role="menu" :aria-label="t('Interface language')"><button type="button" class="language-option" :class="{ selected: locale === 'en' }" role="menuitemradio" :aria-checked="locale === 'en'" @click="setLocale('en')">English<span v-if="locale === 'en'">✓</span></button><button type="button" class="language-option" :class="{ selected: locale === 'ru' }" role="menuitemradio" :aria-checked="locale === 'ru'" @click="setLocale('ru')">Русский<span v-if="locale === 'ru'">✓</span></button></div></div><button type="button" class="topbar-action coupon-center-action" :data-tooltip="t('Coupon codes')" :aria-label="t('Open coupon center')" :aria-expanded="couponModalOpen" @click="openCouponCenter"><TicketPercent :size="18" :stroke-width="2" color="#ffffff" /></button><button type="button" class="topbar-action topbar-changelog-action" :data-tooltip="t('Changelog')" :aria-label="t('Open changelog')" :aria-expanded="changelogOpen" @click="changelogOpen = true"><FileText :size="20" :stroke-width="2.2" /></button></div><div class="mobile-topbar-tools"><button type="button" class="topbar-action mobile-language-toggle" :aria-label="t('Change language')" @click="setLocale(locale === 'en' ? 'ru' : 'en')"><span>{{ locale === 'en' ? 'EN' : 'RU' }}</span></button><button type="button" class="topbar-action coupon-center-action" :aria-label="t('Open coupon center')" @click="openCouponCenter"><TicketPercent :size="18" /></button><button type="button" class="topbar-action topbar-changelog-action" :aria-label="t('Open changelog')" @click="changelogOpen = true"><FileText :size="19" /></button></div>
         </nav>
       </header>
 
@@ -796,11 +812,11 @@ onBeforeUnmount(() => {
       </section>
     </main>
 
-    <div v-if="couponModalOpen" class="modal-backdrop coupon-backdrop" @click.self="couponModalOpen = false">
+    <div v-if="couponModalOpen" class="modal-backdrop coupon-backdrop" @click.self="closeCouponCenter">
       <section class="coupon-modal" role="dialog" aria-modal="true" aria-labelledby="coupon-title">
         <div class="modal-heading">
           <div><div class="eyebrow">BROWN DUST 2</div><h2 id="coupon-title">{{ t('COUPON CENTER') }}</h2></div>
-          <button type="button" class="icon-button" :aria-label="t('Close changelog')" @click="couponModalOpen = false"><X :size="18" /></button>
+          <button type="button" class="icon-button" :aria-label="t('Close changelog')" @click="closeCouponCenter"><X :size="18" /></button>
         </div>
         <label class="coupon-nickname-label" for="coupon-nickname">{{ t('Enter your in-game nickname') }}</label>
         <input id="coupon-nickname" v-model="couponNickname" class="coupon-nickname-input" type="text" autocomplete="nickname" maxlength="40" :placeholder="t('Enter your in-game nickname')" @input="saveCouponNickname" />

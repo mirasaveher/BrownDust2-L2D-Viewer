@@ -1,4 +1,4 @@
-name: Update SR 4.2
+name: Coupon update
 
 on:
   push:
@@ -35,6 +35,9 @@ jobs:
 
       - name: Build site
         run: npm run build
+
+      - name: Configure SPA fallback
+        run: cp dist/index.html dist/404.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
