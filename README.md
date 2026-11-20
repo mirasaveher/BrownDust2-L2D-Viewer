@@ -10,11 +10,11 @@ The project is created and maintained by the administration of the [BrownDust2 T
 
 ## Features
 
-- Browse and view character animations.
+- Browse and view character models, NPCs, and animations.
 - Watch all in-game cutscenes.
-- Export animations as WebM videos.
-- Export individual animation frames as PNG images.
-- Export animations as GIF files.
+- Explore special illustrations and animations.
+- Redeem all available in-game coupons in one click using your player nickname.
+- Export animations as WebM and GIF videos, and individual animation frames as PNG images.
 - Listen to character voice lines.
 
 ## Disclaimer
